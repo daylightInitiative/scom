@@ -54,12 +54,12 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
     */
 
-    svopts->backlog = 20; // define in server.h default max conn
+    svopts->backlog = MAX_CLIENTS;
     svopts->family = AF_INET; // change to AF_UNSPEC later?
     svopts->port = HOSTPORT;
     svopts->logfile = NULL;
 
-    while ((c = getopt(argc, argv, "46Eevh:p:")) != -1) {
+    while ((c = getopt(argc, argv, "46vheE:p:")) != -1) {
 
         switch (c) {
 
@@ -99,7 +99,13 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
             case 'p':
 
+                // TODO: atoi fails, returns 0, no way to distingush err
+                // use strtol for increased error output
+
+                printf("given: %s, %d\n", optarg, optarg);
+
                 int port = atoi(optarg);
+                printf("port: %u\n", port);
 
                 // undefined behavior: atoi fails and port equals zero
 

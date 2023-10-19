@@ -65,7 +65,7 @@ size_t send_socket(int sockfd, char *in, size_t in_size, int flags) {
     
     size_t nbytes = 0;
 
-    // checking if a socket is still open
+    // TODO: checking if a socket is still open
     if (in_size != MAX_MSG) {
         fprintf(stderr, "send_socket: *in must be equal to %d bytes, sized: %ld\n", MAX_MSG, in_size);
         return -1;
@@ -108,7 +108,7 @@ int close_socket(struct Node *client, struct server *srv) {
     return 0;
 }
 
-/* broadcasts to all active sockets */
+/* broadcasts to all active sockets, except to sender, sender may be NULL */
 int broadcast(struct server *srv, struct Node *sender, char *msg) {
 
     /* lets implment this sqii
@@ -127,20 +127,21 @@ int broadcast(struct server *srv, struct Node *sender, char *msg) {
     struct Node *client = NULL;
     struct Node *head = srv->clients->head;
     
-    assert(head != NULL && "srv->clients->head is NULL, this should never happen");
+    //assert(head != NULL && "srv->clients->head is NULL, this should never happen");
 
     /* send a message from x to everybody else excluding x */
     for (client = head; client != NULL; client = client->next) {
         printf("connection %d on %s\n", client->connfd, client->nickname);
 
         if (client == sender)   // sender may be null to indicate "Server: msg"
-            continue;
-        
+            continue; 
+            
         size_t len = strlen(msg);
 
         //send(client->connfd, msg, len, 0);
         // TODO: send sender name, along with message here
         send_socket(client->connfd, msg, MAX_MSG, 0);
+
     }
 
 }
@@ -176,7 +177,7 @@ int init_server(struct server *srv, struct serveropts *svopts) {
 	fcntl(srv->sockfd, F_SETFL, O_NONBLOCK);
 
 	if (srv->sockfd < 0) {
-		perror("socket");  
+		perror("socket");
         return -1;
     }
 
@@ -383,6 +384,9 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
         // note: we cannot use recv here because the socket is not ready to read.
         // note: we must call all reading functions in & EPOLLIN
 
+        // TODO: send connected message
+        // TODO: implement colors with xmacros
+
         return;
     }
 
@@ -414,6 +418,8 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
             
         } else {
             printf("\nsized: %ld\nServer: %s\n", sizeof(msg_buffer), msg_buffer);
+
+            // TODO: package getting the human readable address and port in function
             
             if (svopts->verbose)    // vvvv turn this into a macro
             fprintf((svopts->logfile == NULL) ? (stdout) : (svopts->logfile), 
@@ -439,6 +445,20 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
 
 
 void shutdown_server(struct server *srv) { 
+
+    #define SERVER_SHUTDOWN "Server shutting down...\n"
+
+    if (srv->clients->head != NULL && srv->clients->capacity > 0) {
+
+        // TODO: display shutdown message
+        char message[MAX_MSG] = {0};
+        message[MAX_MSG] = '\0';
+
+        // streamline this buffering process in broadcast?
+        strncat(message, SERVER_SHUTDOWN, MAX_MSG - 1); // copy up until the last char
+        broadcast(srv, NULL, message);
+
+    }
 
     // if there are ( this is more suited to be an internal optimization to list.c
     /*
