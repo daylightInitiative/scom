@@ -48,7 +48,7 @@ void delete_list(struct List *lp) {
  
     //struct Node *current = lp->head;
     // start from the tail, remove items backwards
-    while (lp->head != NULL) {
+    while (lp->head != NULL && lp->capacity > 0) {  // Do not branch
 
         remove_node(lp, lp->head);
 

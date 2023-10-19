@@ -35,5 +35,6 @@ struct server {
 
 int init_server(struct server *srv, struct serveropts *svopts);
 void poll_server(struct server *srv, struct serveropts *svopts, int wait);
+void shutdown_server(struct server *srv);
 
 #endif

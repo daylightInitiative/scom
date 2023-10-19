@@ -6,11 +6,18 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
+#include <signal.h>
+
 #include "server.h"
 
+volatile sig_atomic_t stop;      // static or global here?
 
 // TODO: refactor parse_network_args to server.c
 
+void sigint_handler(int signo) {
+    fprintf(stdout, "\n caught sigint\n exiting.\n");
+    stop = 1;
+}
 
 void usage(int status) {
 
@@ -137,6 +144,10 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
 int main(int argc, char **argv) {
 
+    signal(SIGINT, sigint_handler);
+
+    // TODO: handle other signals
+
     int status = -1;
     int ret = -1;   
 
@@ -159,18 +170,13 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    while (1) {
+    while (!stop) {
 
-       poll_server(&srv, &svopts, 1000); 
+       poll_server(&srv, &svopts, 1000);    // interval constant interval (#define here)
 
     }
 
-    // man 3p shutdown
-
-    close(srv.sockfd);
-    if (close(srv.epollfd)) {
-        perror("close"); // more specific errors?
-    }
+    shutdown_server(&srv);
 
     return 0;
 }

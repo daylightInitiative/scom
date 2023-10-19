@@ -1,4 +1,6 @@
 
+#include <assert.h>
+
 #include <errno.h>
 #include <stdio.h>
 
@@ -32,14 +34,13 @@ void add_epoll_watch(int epollfd, int fd, void* data, int events) {
     }
 }
 
+/* returns nbytes read on success, on failure or client hangup, returns -1 */
+ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
 
+    ssize_t nbytes = 0;
 
-ssize_t read_socket(int sockfd, char *out, size_t size, int flags) {
-
-    ssize_t nbytes;
-
-    if (size != MAX_MSG) {
-        fprintf(stderr, "read_socket: *out must be equal 512 bytes, sized: %ld\n", size);
+    if (out_size != MAX_MSG) {
+        fprintf(stderr, "read_socket: *out must be equal %d bytes, sized: %ld\n", MAX_MSG, out_size);
         return -1;
     }
 
@@ -59,6 +60,28 @@ ssize_t read_socket(int sockfd, char *out, size_t size, int flags) {
     return nbytes;
 }
 
+/* returns nbytes sent on success, on failure returns -1 */
+size_t send_socket(int sockfd, char *in, size_t in_size, int flags) {
+    
+    size_t nbytes = 0;
+
+    // checking if a socket is still open
+    if (in_size != MAX_MSG) {
+        fprintf(stderr, "send_socket: *in must be equal to %d bytes, sized: %ld\n", MAX_MSG, in_size);
+        return -1;
+    }
+
+    in[MAX_MSG] = '\0'; // should this be here? or should *in be const
+    nbytes = send(sockfd, in, in_size, flags);
+
+    /* handle send errors here for specific cases */
+    if (nbytes < 0) {
+        perror("send");
+        return -1;
+    }
+
+    return nbytes;
+}
 
 
 int close_socket(struct Node *client, struct server *srv) {
@@ -73,7 +96,7 @@ int close_socket(struct Node *client, struct server *srv) {
         return -1;
     }
 
-    
+    /* close may fail if something goes horribly wrong */
     if (close(client->connfd) < 0) {
         perror("close");
         return -1;
@@ -85,15 +108,45 @@ int close_socket(struct Node *client, struct server *srv) {
     return 0;
 }
 
+/* broadcasts to all active sockets */
+int broadcast(struct server *srv, struct Node *sender, char *msg) {
 
-int broadcast(struct server *srv, const char *msg) {
+    /* lets implment this sqii
 
+        1. loop over the server struct, until null
+        2. send fixed amount of data to each socket (512)
+        
+        TODO: displaying sender name or server if null
+        TODO: const char *msg fix in read and send
+
+
+    */
+
+    printf("broadcasting\n");
+
+    struct Node *client = NULL;
+    struct Node *head = srv->clients->head;
     
-    
+    assert(head != NULL && "srv->clients->head is NULL, this should never happen");
+
+    /* send a message from x to everybody else excluding x */
+    for (client = head; client != NULL; client = client->next) {
+        printf("connection %d on %s\n", client->connfd, client->nickname);
+
+        if (client == sender)   // sender may be null to indicate "Server: msg"
+            continue;
+        
+        size_t len = strlen(msg);
+
+        //send(client->connfd, msg, len, 0);
+        // TODO: send sender name, along with message here
+        send_socket(client->connfd, msg, MAX_MSG, 0);
+    }
+
 }
 
 
-
+/* returns the sockaddr_in pointer of the specified sa_family */
 void *get_in_addr(struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET) {
@@ -110,40 +163,105 @@ int init_server(struct server *srv, struct serveropts *svopts) {
 
     srv->clients = create_list();
 
-    
+	/* create epoll */
     srv->epollfd = epoll_create(16);
 
-    if (srv->epollfd < 0) {
-        perror("epoll_create");
+	if (srv->epollfd < 0) {
+		perror("epoll_create");
         return -1;
     }
 
-    
+	/* create socket */
     srv->sockfd = socket(svopts->family, SOCK_STREAM, 0);
-    fcntl(srv->sockfd, F_SETFL, O_NONBLOCK);
+	fcntl(srv->sockfd, F_SETFL, O_NONBLOCK);
 
-    if (srv->sockfd < 0) {
-        perror("socket");  
+	if (srv->sockfd < 0) {
+		perror("socket");  
         return -1;
     }
 
-    
-    const int enabled = 1;
-    if (setsockopt(srv->sockfd, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(int)) < 0) {
-        perror("setsockopt");
+	/* set socket options */
+	const int enabled = 1;
+	if (setsockopt(srv->sockfd, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(int)) < 0) {
+		perror("setsockopt");
         return -1;
     }
 
-    // TODO:
-    // created and initialized socket, now to create the
-    // serveraddr struct that specifies our bind interface
-    //      If svopts->family == AF_INET (manually set AF_INET only)
-    //      If svopts->family == AF_INET6 
-    // server can be both ipv4 and ipv6, otherwise if set manually do not
+	// TODO:
+	// created and initialized socket, now to create the
+	// serveraddr struct that specifies our bind interface
+	// 		If svopts->family == AF_INET (manually set AF_INET only)
+	//		If svopts->family == AF_INET6 
+	// server can be both ipv4 and ipv6, otherwise if set manually do not
 
+/*void unused() {
+    switch (svopts->family) {
 
+		case AF_INET:
+			svopts->saddr = (struct sockaddr_in *)calloc(1, sizeof(struct sockaddr_in));
+			svopts->saddr->sin_family = AF_INET;
+			svopts->saddr->sin_port = htons(svopts->port);
+			svopts->saddr->sin_addr.s_addr = htonl(INADDR_ANY);
 
-    
+		case AF_INET6:	// IPV6ONLY 
+			break;
+
+		default:	// AF_UNSPEC use getaddrinfo() 
+			break;
+	}*/
+
+	/*
+	svopts->saddr = (struct sockaddr_storage *)calloc(1, sizeof(struct sockaddr_storage));
+	svopts->saddr->sin_family = AF_INET;
+	svopts->saddr->sin_port = htons(svopts->port);
+	svopts->saddr->sin_addr.s_addr = INADDR_ANY; // htonl? (<hostname> OR 127.0.0.1 OR localhost)
+
+    //struct sockaddr_in *info = (struct sockaddr_in *)&client->caddr;
+    //struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr((struct sockaddr *)&client->caddr);
+
+    // create srv->saddr depending on internet protocol version
+    switch (svopts->family) {
+
+        case AF_INET:       // IPv4 only 
+
+            //struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr(
+                (struct sockaddr *)srv->saddr); // &srv->saddr
+
+            addrinfo->sin_family = AF_INET;
+            addrinfo->sin_port = htons(svopts->port);
+            addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);
+
+            // allocate heap memory for saddr
+            srv->saddr = (struct sockaddr_storage *)calloc(1, sizeof(srv->saddr));
+
+            if (srv->saddr == NULL) {
+                // TODO: errorcodes in server.h, define them
+                fprintf(stderr, "Failure to allocate server address\n");
+                return -1;
+            }
+
+            // sockstorage is simply a union containing all sockaddr types
+            // sockstorage must be cast to a sockaddr * and then fed to get_in_addr 
+            //   to finally return the sockaddr_in ipv4 address
+
+            (struct sockaddr *)srv->saddr->ss_family = AF_INET;     // for sure this is ipv4.
+            struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr(
+                (struct sockaddr *)srv->saddr); // &srv->saddr
+
+            addrinfo->sin_family = AF_INET;
+            addrinfo->sin_port = htons(svopts->port);
+            addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);
+
+            break;
+
+        case AF_INET6:
+            fprintf(stderr, "IPv6 currently not supported.\n");
+            exit(1);
+            break;
+
+        default:
+            break;
+    }}*/
 
     //saddr.sin_family = AF_INET;
     //saddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -203,8 +321,6 @@ int init_server(struct server *srv, struct serveropts *svopts) {
     add_epoll_watch(srv->epollfd, srv->sockfd, srv->sockfd, EPOLLIN);
 
     return 0;
-
-
 }
 
 
@@ -248,10 +364,21 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
         
         add_epoll_watch(srv->epollfd, client->connfd, client, (EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP));
 
-        
+        /* used later for remove */
         //client->srv = srv;
 
-        
+        /*
+        char sent[MAX_MSG] = {0};
+        sent[MAX_MSG - 1] = '\0';
+
+        strncat(sent, "\x0c3IDENT", MAX_MSG - 1);
+
+        printf("connfd: %d\n", client->connfd);
+        ssize_t sbytes = send(client->connfd, sent, MAX_MSG, 0);
+        if (sbytes < 0) {
+            perror("send");
+            return;
+        }*/
 
         // note: we cannot use recv here because the socket is not ready to read.
         // note: we must call all reading functions in & EPOLLIN
@@ -259,15 +386,29 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
         return;
     }
 
-    
+    /* Data arriving on an already-connected socket */
     if (ee.events & EPOLLIN) {
         struct Node *client = ee.data.ptr;
+        assert(client != NULL && "read requested client was NULL");
 
         char msg_buffer[MAX_MSG] = {0}; // array of characters [0] -> first character
         
-        
+        /* an error occured */
         if (read_socket(client->connfd, msg_buffer, sizeof(msg_buffer), 0) < 0) {
 
+            #define CLIENT_DISCON "client has left\n"     // predefined format?
+            // Server: "Jim" has left
+            // TODO: use vfprintf, or fprintf on a buffer??
+
+            // because we are crafting froma string literal, a literal needs a literal
+            // newline.
+
+            char message[MAX_MSG] = {0};
+            message[MAX_MSG] = '\0';   // overwrite the \n character with a null
+
+            strncat(message, CLIENT_DISCON, MAX_MSG - 1); // copy up until the last char
+
+            broadcast(srv, NULL, message);
             if (close_socket(client, srv) < 0)
                 fprintf(stderr, "Failure to close client socket: %s\n", strerror(errno));
             
@@ -281,6 +422,8 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
                      1234,
                      sizeof(msg_buffer),
                      msg_buffer);
+
+            broadcast(srv, client, msg_buffer);
             
         }
 
@@ -295,6 +438,21 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
 }
 
 
+void shutdown_server(struct server *srv) { 
 
+    // if there are ( this is more suited to be an internal optimization to list.c
+    /*
+    if (srv->clients->capacity > 0) {
+        
+    }*/
+
+    delete_list(srv->clients);
+
+    // man 3p shutdown 
+
+    close(srv->sockfd);
+    close(srv->epollfd);
+
+}
 
 
