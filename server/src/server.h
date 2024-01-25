@@ -5,13 +5,26 @@
 #include <netinet/in.h>
 #include "list.h"
 
-#define HOSTADDR "127.0.0.1"
-#define HOSTPORT 5655
+#define HOSTADDR "127.0.0.1" //"127.0.0.1" // localhost INADDR_ANY
+#define HOSTPORT 4444
+
+
+#define MAX_PORT_LEN 10 // 65535
+
+struct ipstr {
+    char address[INET_ADDRSTRLEN];  // inet_pton
+    char port[MAX_PORT_LEN + 1];        // snprintf
+};
+
+// TODO: error handle connection reset by peer (what triggers this error?)
+// TODO: how to get the real ipv4 address
+// TODO: how can we listen on 192.168.1.69
+    // serve on 127.0.0.1 nmap
+    // serve on 192.168.1.69 nmap
 
 #define MAX_MSG      512
 #define MAX_CLIENTS  24
 
-/* serves as the user config from main */
 struct serveropts {
  
     sa_family_t family;     // address family  AF_INET, AF_INET6
@@ -23,7 +36,6 @@ struct serveropts {
     int verbose;            // verbosity enabled
 };
 
-/* the main server object, holds server information */
 struct server {
     
     int sockfd;

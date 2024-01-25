@@ -5,6 +5,7 @@
 #include <assert.h>
 #include "list.h"
 
+// eventually this will instead be a hashtable
 
 struct List *create_list() {
 
@@ -46,9 +47,7 @@ void echo_list(struct List *lp) {
 
 void delete_list(struct List *lp) {
  
-    //struct Node *current = lp->head;
-    // start from the tail, remove items backwards
-    while (lp->head != NULL && lp->capacity > 0) {  // Do not branch
+    while (lp->head != NULL && lp->capacity > 0) {
 
         remove_node(lp, lp->head);
 

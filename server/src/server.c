@@ -34,11 +34,11 @@ void add_epoll_watch(int epollfd, int fd, void* data, int events) {
     }
 }
 
-/* returns nbytes read on success, on failure or client hangup, returns -1 */
+/* reads and returns read nbytes on success, on failure or read of 0, returns -1 */
 ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
 
     ssize_t nbytes = 0;
-
+    
     if (out_size != MAX_MSG) {
         fprintf(stderr, "read_socket: *out must be equal %d bytes, sized: %ld\n", MAX_MSG, out_size);
         return -1;
@@ -50,6 +50,8 @@ ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
     // TODO: ident rfc 512 - 2 = '\0' '\n' reserved
     // both on error and hangup, return -1 to close socket
 
+    // ECONNRESET Connection reset by peer
+
     if (nbytes < 0) {
         perror("recv");
         return -1;
@@ -57,31 +59,37 @@ ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
         return -1;
     }
 
+    printf("received %ld bytes\n", nbytes);
+
     return nbytes;
 }
 
-/* returns nbytes sent on success, on failure returns -1 */
-size_t send_socket(int sockfd, char *in, size_t in_size, int flags) {
+
+
+
+/* copies *in and sends it, returns sent nbytes on success, on failure returns -1 */
+ssize_t send_socket(int sockfd, char *in, int flags) {
     
-    size_t nbytes = 0;
+    ssize_t nbytes = 0;
+    char sent[MAX_MSG] = {0};
+    sent[MAX_MSG] = '\0';
 
-    // TODO: checking if a socket is still open
-    if (in_size != MAX_MSG) {
-        fprintf(stderr, "send_socket: *in must be equal to %d bytes, sized: %ld\n", MAX_MSG, in_size);
-        return -1;
-    }
+    strncat(sent, in, MAX_MSG - 1);        // TODO: MAX_MSG - 2 Enforce \n
+                                            // TODO: strip user added \n's
+    size_t sent_size = strlen(sent);
+    nbytes = send(sockfd, sent, sent_size, flags);
 
-    in[MAX_MSG] = '\0'; // should this be here? or should *in be const
-    nbytes = send(sockfd, in, in_size, flags);
-
-    /* handle send errors here for specific cases */
     if (nbytes < 0) {
         perror("send");
         return -1;
     }
 
+    printf("sent %ld bytes\n", nbytes);
+
     return nbytes;
 }
+
+
 
 
 int close_socket(struct Node *client, struct server *srv) {
@@ -89,14 +97,13 @@ int close_socket(struct Node *client, struct server *srv) {
     fprintf(stdout, "closing socket %d\n", client->connfd);
     
     struct epoll_event ee = {0};
-    int ret = epoll_ctl(srv->epollfd, EPOLL_CTL_DEL, client->connfd, &ee); // we need to attach srv to client struct
+    int ret = epoll_ctl(srv->epollfd, EPOLL_CTL_DEL, client->connfd, &ee);
 
     if (ret < 0) {
         perror("epoll_ctl");
         return -1;
     }
 
-    /* close may fail if something goes horribly wrong */
     if (close(client->connfd) < 0) {
         perror("close");
         return -1;
@@ -111,14 +118,12 @@ int close_socket(struct Node *client, struct server *srv) {
 /* broadcasts to all active sockets, except to sender, sender may be NULL */
 int broadcast(struct server *srv, struct Node *sender, char *msg) {
 
-    /* lets implment this sqii
 
-        1. loop over the server struct, until null
-        2. send fixed amount of data to each socket (512)
-        
+    /* 
+
         TODO: displaying sender name or server if null
         TODO: const char *msg fix in read and send
-
+        TODO: what does broadcast return??
 
     */
 
@@ -127,23 +132,20 @@ int broadcast(struct server *srv, struct Node *sender, char *msg) {
     struct Node *client = NULL;
     struct Node *head = srv->clients->head;
     
-    //assert(head != NULL && "srv->clients->head is NULL, this should never happen");
+    assert(head != NULL && "srv->clients->head is NULL, this should never happen");
 
-    /* send a message from x to everybody else excluding x */
     for (client = head; client != NULL; client = client->next) {
         printf("connection %d on %s\n", client->connfd, client->nickname);
 
-        if (client == sender)   // sender may be null to indicate "Server: msg"
+        if (client == sender) 
             continue; 
-            
-        size_t len = strlen(msg);
 
-        //send(client->connfd, msg, len, 0);
         // TODO: send sender name, along with message here
-        send_socket(client->connfd, msg, MAX_MSG, 0);
+        send_socket(client->connfd, msg, 0);
 
     }
 
+    return 0;
 }
 
 
@@ -158,6 +160,45 @@ void *get_in_addr(struct sockaddr *sa)
 }
 
 
+/* returns an ipstr struct that contains the presentation string converted ipaddress and port */
+struct ipstr get_ip_str(struct sockaddr *sa) {
+     
+    
+    struct sockaddr_in *addr_in = (struct sockaddr_in *)get_in_addr((struct sockaddr *)sa);
+    struct ipstr str = {0};
+     
+    const char *paddress = NULL;
+    int status = -1;     
+
+    // TODO: add ipv6 support here, or in another function?
+
+    assert(addr_in != NULL);
+
+    paddress = inet_ntop(
+        AF_INET, 
+        &(addr_in->sin_addr),
+        str.address,
+        INET_ADDRSTRLEN
+    );
+
+    if (paddress == NULL) {
+        perror("inet_ntop");
+        exit(1);
+    }
+
+    // PORT_MAX will be -1 the sizeof
+    int port = ntohs(addr_in->sin_port);
+    status = snprintf(str.port, MAX_PORT_LEN, "%d", port);
+
+    if (status < 0) {
+        perror("snprintf");
+    }
+
+    return str;
+}
+
+// TODO: refactor to give svopts a more descriptive name,
+//          srvconf,    srvopts,    srvsett,    srv
 int init_server(struct server *srv, struct serveropts *svopts) {
 
     fprintf(stdout, "initializing server...\n");
@@ -188,95 +229,15 @@ int init_server(struct server *srv, struct serveropts *svopts) {
         return -1;
     }
 
-	// TODO:
-	// created and initialized socket, now to create the
-	// serveraddr struct that specifies our bind interface
-	// 		If svopts->family == AF_INET (manually set AF_INET only)
-	//		If svopts->family == AF_INET6 
-	// server can be both ipv4 and ipv6, otherwise if set manually do not
-
-/*void unused() {
-    switch (svopts->family) {
-
-		case AF_INET:
-			svopts->saddr = (struct sockaddr_in *)calloc(1, sizeof(struct sockaddr_in));
-			svopts->saddr->sin_family = AF_INET;
-			svopts->saddr->sin_port = htons(svopts->port);
-			svopts->saddr->sin_addr.s_addr = htonl(INADDR_ANY);
-
-		case AF_INET6:	// IPV6ONLY 
-			break;
-
-		default:	// AF_UNSPEC use getaddrinfo() 
-			break;
-	}*/
-
-	/*
-	svopts->saddr = (struct sockaddr_storage *)calloc(1, sizeof(struct sockaddr_storage));
-	svopts->saddr->sin_family = AF_INET;
-	svopts->saddr->sin_port = htons(svopts->port);
-	svopts->saddr->sin_addr.s_addr = INADDR_ANY; // htonl? (<hostname> OR 127.0.0.1 OR localhost)
-
-    //struct sockaddr_in *info = (struct sockaddr_in *)&client->caddr;
-    //struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr((struct sockaddr *)&client->caddr);
-
-    // create srv->saddr depending on internet protocol version
-    switch (svopts->family) {
-
-        case AF_INET:       // IPv4 only 
-
-            //struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr(
-                (struct sockaddr *)srv->saddr); // &srv->saddr
-
-            addrinfo->sin_family = AF_INET;
-            addrinfo->sin_port = htons(svopts->port);
-            addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);
-
-            // allocate heap memory for saddr
-            srv->saddr = (struct sockaddr_storage *)calloc(1, sizeof(srv->saddr));
-
-            if (srv->saddr == NULL) {
-                // TODO: errorcodes in server.h, define them
-                fprintf(stderr, "Failure to allocate server address\n");
-                return -1;
-            }
-
-            // sockstorage is simply a union containing all sockaddr types
-            // sockstorage must be cast to a sockaddr * and then fed to get_in_addr 
-            //   to finally return the sockaddr_in ipv4 address
-
-            (struct sockaddr *)srv->saddr->ss_family = AF_INET;     // for sure this is ipv4.
-            struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr(
-                (struct sockaddr *)srv->saddr); // &srv->saddr
-
-            addrinfo->sin_family = AF_INET;
-            addrinfo->sin_port = htons(svopts->port);
-            addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);
-
-            break;
-
-        case AF_INET6:
-            fprintf(stderr, "IPv6 currently not supported.\n");
-            exit(1);
-            break;
-
-        default:
-            break;
-    }}*/
-
-    //saddr.sin_family = AF_INET;
-    //saddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    //saddr.sin_port = htons(HOSTPORT);
-
-
+    /* It may be important to zero out the padding bytes using memset, instead of = {0};
+         when writing to external storage, network or comparing with memcmp */
     memset(&srv->saddr, 0, sizeof(struct sockaddr_storage));
 
     switch (svopts->family) {
 
         case AF_INET:
 
-            // get sockaddr_in
-            // fill values
+            // get sockaddr_in from srv->saddr (sockstorage)
             struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr(
                 (struct sockaddr *)&srv->saddr); 
 
@@ -284,21 +245,15 @@ int init_server(struct server *srv, struct serveropts *svopts) {
             addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);
             addrinfo->sin_port = htons(svopts->port);
 
-            // what type is srv->saddr
-            // may be logically wrong, need to get sockaddr_in for this size
-            if (bind(srv->sockfd, (struct sockaddr *)addrinfo, sizeof(*addrinfo)) < 0) {
+            int bind_status = bind(srv->sockfd, (struct sockaddr *)addrinfo, sizeof(*addrinfo));
+
+            if (bind_status < 0) {
                 perror("bind");
                 return -1;
             }
-
-            char address[INET_ADDRSTRLEN] = {0};
-            inet_ntop(AF_INET,
-                addrinfo,
-                address,
-                sizeof(address)
-            ); 
-
-            fprintf(stdout, "Server Listening on %s:%u\n", inet_ntoa(addrinfo->sin_addr), svopts->port);
+        
+            struct ipstr ipaddr = get_ip_str((struct sockaddr *)&srv->saddr);
+            fprintf(stdout, "Server Listening on %s:%s\n", ipaddr.address, ipaddr.port);
 
             break;
 
@@ -310,15 +265,12 @@ int init_server(struct server *srv, struct serveropts *svopts) {
 
     }
 
-    printf("sized: %ld", sizeof(srv->saddr)); 
-
     if (listen(srv->sockfd, svopts->backlog) < 0) {
         perror("listen");
         return -1;
     }
 
     // getaddrinfo is the most retarded function ever created.
-    //add_epoll_watch(epollfd, sockfd, sockfd, EPOLLIN);
     add_epoll_watch(srv->epollfd, srv->sockfd, srv->sockfd, EPOLLIN);
 
     return 0;
@@ -329,8 +281,6 @@ int init_server(struct server *srv, struct serveropts *svopts) {
 void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
 
     struct epoll_event ee = {0};
-  
-    //printf("epoll tick:\n");
 
     int ret = epoll_wait(srv->epollfd, &ee, 1, wait);
 
@@ -348,79 +298,42 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
         fcntl(client->connfd, F_SETFL, O_NONBLOCK);
 
         printf("new connection established: %d, %p\n", client->connfd, &client->caddr);
+  
+        struct ipstr ipaddr = get_ip_str((struct sockaddr *)&client->caddr); 
+        //struct ipstr ipaddr = get_ip_str((struct sockaddr *)&srv->saddr);
 
-        struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr((struct sockaddr *)&client->caddr); 
-        char address[INET_ADDRSTRLEN] = {0};
-        
-        inet_ntop(client->caddr.ss_family,
-            //get_in_addr((struct sockaddr *)&client->caddr),
-            addrinfo,
-            address,
-            sizeof address); 
-
-        // simple addrinfo
-        struct sockaddr_in *info = (struct sockaddr_in *)&client->caddr;
-        int port = ntohs(info->sin_port);        // converting network to our host byte order (16 for port)
-        printf("Received new connection from %s:%d\n", address, port);
+        printf("Received new connection from %s:%s\n", ipaddr.address, ipaddr.port);
         
         add_epoll_watch(srv->epollfd, client->connfd, client, (EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP));
-
-        /* used later for remove */
-        //client->srv = srv;
-
-        /*
-        char sent[MAX_MSG] = {0};
-        sent[MAX_MSG - 1] = '\0';
-
-        strncat(sent, "\x0c3IDENT", MAX_MSG - 1);
-
-        printf("connfd: %d\n", client->connfd);
-        ssize_t sbytes = send(client->connfd, sent, MAX_MSG, 0);
-        if (sbytes < 0) {
-            perror("send");
-            return;
-        }*/
-
-        // note: we cannot use recv here because the socket is not ready to read.
-        // note: we must call all reading functions in & EPOLLIN
-
         // TODO: send connected message
         // TODO: implement colors with xmacros
+
+        // EPOLLIN  - ready to read
+        // EPOLLOUT - ready to write
 
         return;
     }
 
     /* Data arriving on an already-connected socket */
     if (ee.events & EPOLLIN) {
+
         struct Node *client = ee.data.ptr;
         assert(client != NULL && "read requested client was NULL");
 
-        char msg_buffer[MAX_MSG] = {0}; // array of characters [0] -> first character
+        char msg_buffer[MAX_MSG] = {0};
         
         /* an error occured */
         if (read_socket(client->connfd, msg_buffer, sizeof(msg_buffer), 0) < 0) {
 
-            #define CLIENT_DISCON "client has left\n"     // predefined format?
-            // Server: "Jim" has left
-            // TODO: use vfprintf, or fprintf on a buffer??
+            #define CLIENT_DISCON "client has left\n"
 
-            // because we are crafting froma string literal, a literal needs a literal
-            // newline.
-
-            char message[MAX_MSG] = {0};
-            message[MAX_MSG] = '\0';   // overwrite the \n character with a null
-
-            strncat(message, CLIENT_DISCON, MAX_MSG - 1); // copy up until the last char
-
-            broadcast(srv, NULL, message);
+            broadcast(srv, NULL, CLIENT_DISCON);
             if (close_socket(client, srv) < 0)
                 fprintf(stderr, "Failure to close client socket: %s\n", strerror(errno));
             
         } else {
-            printf("\nsized: %ld\nServer: %s\n", sizeof(msg_buffer), msg_buffer);
-
-            // TODO: package getting the human readable address and port in function
-            
+            printf("\nServer: %s\n", msg_buffer);
+ 
             if (svopts->verbose)    // vvvv turn this into a macro
             fprintf((svopts->logfile == NULL) ? (stdout) : (svopts->logfile), 
                     "<host %s:%u sent %ld byte(s): [%s]>\n",
@@ -430,11 +343,19 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
                      msg_buffer);
 
             broadcast(srv, client, msg_buffer);
-            
         }
+                
+            // read hangup?
+    } else if (ee.events & (EPOLLRDHUP | EPOLLHUP)) {
+        printf("closing connection triggered\n");
 
+        // whenever SEND_SHUTDOWN or RCV_SHUTDOWN are marked, this is called.
+        // which is equal to a call of shutdown(SHUT_WR | SHUT_RD)
+        //https://stackoverflow.com/questions/52976152/tcp-when-is-epollhup-generated
 
+        return;
     }
+
 
 
 
@@ -448,25 +369,12 @@ void shutdown_server(struct server *srv) {
 
     #define SERVER_SHUTDOWN "Server shutting down...\n"
 
-    if (srv->clients->head != NULL && srv->clients->capacity > 0) {
+    if (srv->clients->head != NULL && srv->clients->capacity >= 1) {
 
-        // TODO: display shutdown message
-        char message[MAX_MSG] = {0};
-        message[MAX_MSG] = '\0';
-
-        // streamline this buffering process in broadcast?
-        strncat(message, SERVER_SHUTDOWN, MAX_MSG - 1); // copy up until the last char
-        broadcast(srv, NULL, message);
-
+        broadcast(srv, NULL, SERVER_SHUTDOWN);
     }
 
-    // if there are ( this is more suited to be an internal optimization to list.c
-    /*
-    if (srv->clients->capacity > 0) {
-        
-    }*/
-
-    delete_list(srv->clients);
+    delete_list(srv->clients);  // ALWAYS delete clients
 
     // man 3p shutdown 
 

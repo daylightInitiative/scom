@@ -10,7 +10,7 @@
 
 #include "server.h"
 
-volatile sig_atomic_t stop;      // static or global here?
+volatile sig_atomic_t stop;
 
 // TODO: refactor parse_network_args to server.c
 
@@ -83,6 +83,8 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
                     if (svopts->logfile 
                 }*/
 
+                // lets say i want to log to stderr and STREAM, its quite a common task isnt it
+
                 break;
 
             case 'e':
@@ -102,12 +104,17 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
                 // TODO: atoi fails, returns 0, no way to distingush err
                 // use strtol for increased error output
 
-                printf("given: %s, %d\n", optarg, optarg);
-
                 int port = atoi(optarg);
                 printf("port: %u\n", port);
 
                 // undefined behavior: atoi fails and port equals zero
+
+
+                // TODO: binding on port 0 returns a random port number, make this an option?
+                if (port == 0) {
+                    fprintf(stderr, "Invalid port number supplied\n");
+                    return -1;
+                }
 
                 // If its under 1034, need root
                 // If its greater than 1034, and not more than 65,535
@@ -164,11 +171,9 @@ int main(int argc, char **argv) {
 
     if (ret < 0) {
         fprintf(stderr, "Failure to parse network arguments\n");
-        //goto FAILURE; ??
         exit(EXIT_FAILURE);
     }
     
-    /* initialize server */
     status = init_server(&srv, &svopts);
 
     if (status < 0) {

@@ -1,6 +1,7 @@
 
 #ifndef SCOM_LIST_H
 #define SCOM_LIST_H
+
 #include <netinet/in.h>
 #include <sys/socket.h>
 
@@ -8,7 +9,6 @@
 
 #define MAX_NAME 32
 
-// TODO: hashmap or queue?? implementation
 struct Node {
 
     char nickname[MAX_NAME];
