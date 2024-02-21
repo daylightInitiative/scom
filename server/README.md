@@ -19,12 +19,12 @@
 
 Using telnet:
     
-    `telnet 0.0.0.0 4444`
+    telnet 0.0.0.0 4444
     
 
 Using nc:
     
-    `nc 0.0.0.0 4444`
+    nc 0.0.0.0 4444
     
 
 optionally you can connect multiple windows for a proof of concept
