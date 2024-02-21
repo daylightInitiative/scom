@@ -83,7 +83,7 @@ ssize_t send_socket(int sockfd, char *in, int flags) {
     if (nbytes < 0) {
 
         if (nbytes == ECONNRESET) { 
-            printf("conn %d: forcibly closed the connection\n");
+            printf("conn %d: forcibly closed the connection\n", sockfd);
         } else {
             perror("send");
             return -1;
