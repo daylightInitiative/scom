@@ -16,15 +16,16 @@
 
     The client version of the software is not finished yet, so poke at it some tcp tools.
 
-    Using `telnet`:
-        ```sh
-                telnet 0.0.0.0 4444  
-        ``
 
-    Using `nc`:
-        ```sh
-                nc 0.0.0.0 4444
-        ```
+Using telnet:
     
-    optionally you can connect multiple windows for a proof of concept
-    this also works with any computer connected to the local network
+    `telnet 0.0.0.0 4444`
+    
+
+Using nc:
+    
+    `nc 0.0.0.0 4444`
+    
+
+optionally you can connect multiple windows for a proof of concept
+this also works with any computer connected to the local network
