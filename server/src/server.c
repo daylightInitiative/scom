@@ -34,7 +34,9 @@ void add_epoll_watch(int epollfd, int fd, void* data, int events) {
     }
 }
 
-/* reads and returns read nbytes on success, on failure or read of 0, returns -1 */
+
+
+/* recv's into *out, returns recv'd nbytes on success, upon failure to read of 0, returns -1 */
 ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
 
     ssize_t nbytes = 0;
@@ -44,10 +46,10 @@ ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
         return -1;
     }
 
-    out[MAX_MSG] = '\0'; // set limits before reading
+    memset(out, '\0', MAX_MSG);
     nbytes = recv(sockfd, out, (MAX_MSG - 1), flags);
  
-    // TODO: ident rfc 512 - 2 = '\0' '\n' reserved
+    // TODO: reserve -1 and -2 for the \n and \0
     // both on error and hangup, return -1 to close socket
 
     // ECONNRESET Connection reset by peer
@@ -59,32 +61,38 @@ ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
         return -1;
     }
 
-    printf("received %ld bytes\n", nbytes);
+    printf("received %ld bytes on %d\n", nbytes, sockfd);
 
     return nbytes;
 }
 
 
 
-
-/* copies *in and sends it, returns sent nbytes on success, on failure returns -1 */
+/* copies string literal *in and sends it, returns sent nbytes on success, on failure returns -1 */
 ssize_t send_socket(int sockfd, char *in, int flags) {
     
     ssize_t nbytes = 0;
-    char sent[MAX_MSG] = {0};
-    sent[MAX_MSG] = '\0';
-
+    char sent[MAX_MSG];
+    
+    memset(sent, '\0', MAX_MSG);
     strncat(sent, in, MAX_MSG - 1);        // TODO: MAX_MSG - 2 Enforce \n
                                             // TODO: strip user added \n's
     size_t sent_size = strlen(sent);
     nbytes = send(sockfd, sent, sent_size, flags);
 
     if (nbytes < 0) {
-        perror("send");
+
+        if (nbytes == ECONNRESET) { 
+            printf("conn %d: forcibly closed the connection\n");
+        } else {
+            perror("send");
+            return -1;
+        }
+    } else if (nbytes == 0) {
         return -1;
     }
 
-    printf("sent %ld bytes\n", nbytes);
+    printf("sent %ld bytes to %d\n", nbytes, sockfd);
 
     return nbytes;
 }
@@ -159,12 +167,9 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-
 /* returns an ipstr struct that contains the presentation string converted ipaddress and port */
-struct ipstr get_ip_str(struct sockaddr *sa) {
-     
-    
-    struct sockaddr_in *addr_in = (struct sockaddr_in *)get_in_addr((struct sockaddr *)sa);
+struct ipstr get_ip_str(struct sockaddr_storage *ss) {
+    struct sockaddr_in *addr_in = (struct sockaddr_in *)get_in_addr((struct sockaddr *)ss);
     struct ipstr str = {0};
      
     const char *paddress = NULL;
@@ -175,7 +180,7 @@ struct ipstr get_ip_str(struct sockaddr *sa) {
     assert(addr_in != NULL);
 
     paddress = inet_ntop(
-        AF_INET, 
+        ss->ss_family, 
         &(addr_in->sin_addr),
         str.address,
         INET_ADDRSTRLEN
@@ -187,7 +192,8 @@ struct ipstr get_ip_str(struct sockaddr *sa) {
     }
 
     // PORT_MAX will be -1 the sizeof
-    int port = ntohs(addr_in->sin_port);
+    uint16_t port = ntohs(addr_in->sin_port);
+    printf("coming from port %d\n", port);
     status = snprintf(str.port, MAX_PORT_LEN, "%d", port);
 
     if (status < 0) {
@@ -233,16 +239,17 @@ int init_server(struct server *srv, struct serveropts *svopts) {
          when writing to external storage, network or comparing with memcmp */
     memset(&srv->saddr, 0, sizeof(struct sockaddr_storage));
 
+    // it is important that we set what protocol we are using in the storage object
+    srv->saddr.ss_family = svopts->family;
+
     switch (svopts->family) {
 
         case AF_INET:
 
-            // get sockaddr_in from srv->saddr (sockstorage)
-            struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr(
-                (struct sockaddr *)&srv->saddr); 
+            struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr((struct sockaddr *)&srv->saddr); 
 
             addrinfo->sin_family = AF_INET;
-            addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);
+            addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);      // htonl (INADDR_ANY) is required here.
             addrinfo->sin_port = htons(svopts->port);
 
             int bind_status = bind(srv->sockfd, (struct sockaddr *)addrinfo, sizeof(*addrinfo));
@@ -252,8 +259,52 @@ int init_server(struct server *srv, struct serveropts *svopts) {
                 return -1;
             }
         
-            struct ipstr ipaddr = get_ip_str((struct sockaddr *)&srv->saddr);
+            printf("server listening on %s\n", inet_ntoa(addrinfo->sin_addr));
+        
+            
+            struct ipstr ipaddr = get_ip_str(&srv->saddr);
             fprintf(stdout, "Server Listening on %s:%s\n", ipaddr.address, ipaddr.port);
+
+
+
+            socklen_t len = 0;
+            struct sockaddr_storage srvaddr = {0};
+            char ipstrs[INET_ADDRSTRLEN] = {0};
+            int port = 0;
+               
+            printf("receiving sockname\n");     
+            len = sizeof(srvaddr);
+            int ret = getsockname(srv->sockfd, (struct sockaddr *)&srvaddr, &len);
+
+            if (ret < 0) {
+                perror("getpeername");
+            }
+
+            if (srvaddr.ss_family == AF_INET) {
+                printf("Connection normal\n");
+                struct sockaddr_in *s = (struct sockaddr_in *)&srvaddr;
+                port = ntohs(s->sin_port);
+                inet_ntop(AF_INET, &s->sin_addr, ipstrs, sizeof(ipstrs));
+            } else {
+                // IPv6
+                printf("Handling IPv6 connection\n");
+            }
+
+
+
+            // Instead of making two whole functions for both connected client and server
+            // why dont we just have two wrappers over a DRY interface
+            printf("=====================================\n");
+            printf("Server sock name: %s:%d\n", ipstrs, port);
+
+            // Lets rememeber that 0.0.0.0 means its listening from connections on all interfaces (ips)
+
+            //INADDR_LOOPBACK (127.0.0.1)
+              //        always refers to the local host via the loopback device;
+
+           //INADDR_ANY (0.0.0.0)
+            //      means any address for socket binding;
+
 
             break;
 
@@ -289,24 +340,52 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
     // New connection
     if (ee.data.fd == srv->sockfd) {
         struct Node *client = insert_node(srv->clients);
-        echo_list(srv->clients);
 
-        memset(&client->caddr, '\0', sizeof(client->caddr));
-        socklen_t addrlen = sizeof(client->caddr);  // I didn't realize this was important read manual harder
+        //echo_list(srv->clients);
 
+
+        memset(&client->caddr, 0, sizeof(client->caddr));
+        socklen_t addrlen = sizeof(client->caddr);
+        // I didn't realize this was important read manual harder
+
+        // TODO: accept may need error handling
         client->connfd = accept(srv->sockfd, (struct sockaddr *)&client->caddr, &addrlen);
         fcntl(client->connfd, F_SETFL, O_NONBLOCK);
 
-        printf("new connection established: %d, %p\n", client->connfd, &client->caddr);
-  
-        struct ipstr ipaddr = get_ip_str((struct sockaddr *)&client->caddr); 
-        //struct ipstr ipaddr = get_ip_str((struct sockaddr *)&srv->saddr);
+        printf("new connection established: %d, %p\n", client->connfd, (void*)&client->caddr);
+            
+        // !TODO trying out getpeername for both server and client.
+        // if this works ill just replace the whole thing
 
-        printf("Received new connection from %s:%s\n", ipaddr.address, ipaddr.port);
+        socklen_t len = 0;
+        struct sockaddr_storage peeraddr = {0};
+        char ipstr[INET_ADDRSTRLEN] = {0};
+        int port = 0;
+           
+        printf("receiving peername\n");     
+        len = sizeof(peeraddr);
+        int ret = getpeername(client->connfd, (struct sockaddr *)&peeraddr, &len);
+
+        if (ret < 0) {
+            perror("getpeername");
+        }
+
+        if (peeraddr.ss_family == AF_INET) {
+            printf("Connection normal\n");
+            struct sockaddr_in *s = (struct sockaddr_in *)&peeraddr;
+            port = ntohs(s->sin_port);
+            inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof(ipstr));
+        } else {
+            // IPv6
+            printf("Handling IPv6 connection\n");
+        }
+
+
+
+        printf("Received new connection from %s:%d\n", ipstr, port);
         
         add_epoll_watch(srv->epollfd, client->connfd, client, (EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP));
         // TODO: send connected message
-        // TODO: implement colors with xmacros
 
         // EPOLLIN  - ready to read
         // EPOLLOUT - ready to write
@@ -324,7 +403,7 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
         
         /* an error occured */
         if (read_socket(client->connfd, msg_buffer, sizeof(msg_buffer), 0) < 0) {
-
+            
             #define CLIENT_DISCON "client has left\n"
 
             broadcast(srv, NULL, CLIENT_DISCON);

@@ -15,9 +15,9 @@ struct Node {
     int connfd;
     
     struct sockaddr_storage caddr;
-    socklen_t sock_len;
+    socklen_t sock_len; 
 
-    struct server *srv;
+    struct server *srv; // should be *?
 
     struct Node *next;
     struct Node *prev;

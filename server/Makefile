@@ -10,7 +10,7 @@ SRC=$(foreach x, $(SRC_PATH), $(wildcard $(addprefix $(x)/*,.c*)))
 OBJS=$(addprefix $(OBJ_PATH)/, $(addsuffix .o, $(notdir $(basename $(SRC)))))
 
 INCLUDES=
-CFLAGS=-O0 -Wall -Wextra -ggdb $(INCLUDES)
+CFLAGS=-O0 -Wall -Wextra  -pedantic -ggdb $(INCLUDES)
 ##-Wall -Wextra -g $(INCLUDES)
 LDFLAGS=
 

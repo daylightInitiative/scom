@@ -37,7 +37,7 @@ void usage(int status) {
 
 int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
-    //memset(svopts, 0, sizeof(struct serveropts));
+    memset(svopts, 0, sizeof(struct serveropts));
 
     int c;
 
@@ -73,10 +73,10 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
             case 'E':
                 fprintf(stdout, "Logging to %s\n", optarg);
-                // TODO: check access(), if not stdin, close(logfile) [verify file]
+                // TODO check access(), if not stdin, close(logfile) [verify file]
 
-                /*  TODO: add logging library, set log mode by verbosity
-                // TODO: echo to stdout and logfile bitmask
+                /*  TODO add logging library, set log mode by verbosity
+                // TODO echo to stdout and logfile bitmask
                 if (!file_exists) {
                     svopts->logfile = (FILE *)fopen(optarg, "w");
 
@@ -101,7 +101,8 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
             case 'p':
 
-                // TODO: atoi fails, returns 0, no way to distingush err
+                printf("custom port selected\n");
+                // TODO atoi fails, returns 0, no way to distingush err
                 // use strtol for increased error output
 
                 int port = atoi(optarg);
@@ -110,7 +111,7 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
                 // undefined behavior: atoi fails and port equals zero
 
 
-                // TODO: binding on port 0 returns a random port number, make this an option?
+                // TODO binding on port 0 returns a random port number, make this an option?
                 if (port == 0) {
                     fprintf(stderr, "Invalid port number supplied\n");
                     return -1;
