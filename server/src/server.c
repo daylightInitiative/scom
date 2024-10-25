@@ -93,6 +93,7 @@ ssize_t send_socket(int sockfd, char *in, int flags) {
     }
 
     printf("sent %ld bytes to %d\n", nbytes, sockfd);
+    printf("raw: %s", sent);
 
     return nbytes;
 }
@@ -145,11 +146,24 @@ int broadcast(struct server *srv, struct Node *sender, char *msg) {
     for (client = head; client != NULL; client = client->next) {
         printf("connection %d on %s\n", client->connfd, client->nickname);
 
-        if (client == sender) 
+    // if sender is NULL then we want to broadcast to everybody
+    // if sender is NOT null we want to broadcast to everybody except sender    
+
+    if (sender == client) {
+        continue;
+    }
+
+    send_socket(client->connfd, msg, 0);
+
+
+
+        /*if (sender != NULL && client == sender) {
+        printf("Triggered that one edge case\n");
             continue; 
+    }*/
 
         // TODO: send sender name, along with message here
-        send_socket(client->connfd, msg, 0);
+        //send_socket(client->connfd, msg, 0);
 
     }
 
@@ -211,27 +225,27 @@ int init_server(struct server *srv, struct serveropts *svopts) {
 
     srv->clients = create_list();
 
-	/* create epoll */
+    /* create epoll */
     srv->epollfd = epoll_create(16);
 
-	if (srv->epollfd < 0) {
-		perror("epoll_create");
+    if (srv->epollfd < 0) {
+        perror("epoll_create");
         return -1;
     }
 
-	/* create socket */
+    /* create socket */
     srv->sockfd = socket(svopts->family, SOCK_STREAM, 0);
-	fcntl(srv->sockfd, F_SETFL, O_NONBLOCK);
+    fcntl(srv->sockfd, F_SETFL, O_NONBLOCK);
 
-	if (srv->sockfd < 0) {
-		perror("socket");
+    if (srv->sockfd < 0) {
+        perror("socket");
         return -1;
     }
 
-	/* set socket options */
-	const int enabled = 1;
-	if (setsockopt(srv->sockfd, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(int)) < 0) {
-		perror("setsockopt");
+    /* set socket options */
+    const int enabled = 1;
+    if (setsockopt(srv->sockfd, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(int)) < 0) {
+        perror("setsockopt");
         return -1;
     }
 
@@ -245,7 +259,7 @@ int init_server(struct server *srv, struct serveropts *svopts) {
     switch (svopts->family) {
 
         case AF_INET:
-
+            
             struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr((struct sockaddr *)&srv->saddr); 
 
             addrinfo->sin_family = AF_INET;
@@ -400,19 +414,32 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
         assert(client != NULL && "read requested client was NULL");
 
         char msg_buffer[MAX_MSG] = {0};
+        memset(&msg_buffer, '\0', sizeof(msg_buffer));
+        // i should probably memset this before sending it over the net
         
         /* an error occured */
         if (read_socket(client->connfd, msg_buffer, sizeof(msg_buffer), 0) < 0) {
             
             #define CLIENT_DISCON "client has left\n"
-
+    
+        // lets try to find out why this isnt sending
             broadcast(srv, NULL, CLIENT_DISCON);
             if (close_socket(client, srv) < 0)
                 fprintf(stderr, "Failure to close client socket: %s\n", strerror(errno));
             
         } else {
+
+        if (strlen(client->nickname) > 1) {
+        
             printf("\nServer: %s\n", msg_buffer);
- 
+
+
+        } else {
+            printf("\n%s: %s\n", client->nickname, msg_buffer);
+        }
+    
+             
+
             if (svopts->verbose)    // vvvv turn this into a macro
             fprintf((svopts->logfile == NULL) ? (stdout) : (svopts->logfile), 
                     "<host %s:%u sent %ld byte(s): [%s]>\n",
@@ -422,7 +449,19 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
                      msg_buffer);
 
             broadcast(srv, client, msg_buffer);
-        }
+    }
+
+        
+
+        // parse commands here use strtok to get the argument of the command
+        if (strncmp("/nick", msg_buffer, 5) == 0) {
+        printf("Recieved switch\n");
+
+        memset(client->nickname, '\0', sizeof(client->nickname));
+        char *username = "admin";
+        strncpy(client->nickname, username, strlen(username));
+        //client->nickname = "admin";
+    }
                 
             // read hangup?
     } else if (ee.events & (EPOLLRDHUP | EPOLLHUP)) {
@@ -434,9 +473,6 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait) {
 
         return;
     }
-
-
-
 
 
 
