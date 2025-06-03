@@ -38,6 +38,62 @@ void sigint_handler(int signo) {
     write(STDOUT_FILENO, "\n[!] SIGINT received. Exiting...\n", 33);
 }
 
+#define MAX_PORT_LEN 10 // 65535
+
+struct ipstr {
+    char address[INET_ADDRSTRLEN];
+    char port[MAX_PORT_LEN + 1];
+};
+
+/* returns the sockaddr_in pointer of the specified sa_family */
+void *get_in_addr(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET) {
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+/* returns an ipstr struct that contains the presentation string converted ipaddress and port */
+struct ipstr get_ip_str(struct sockaddr_storage *ss) {
+    struct sockaddr_in *addr_in = (struct sockaddr_in *)get_in_addr((struct sockaddr *)ss);
+    struct ipstr str = {0};
+    
+    const char *paddress = NULL;
+    int status = -1;
+    uint16_t port = 0;
+
+    assert(ss != NULL);
+
+    if (ss->ss_family == AF_INET) {
+        struct sockaddr_in *addr_in = (struct sockaddr_in *)ss;
+        paddress = inet_ntop(AF_INET, &(addr_in->sin_addr), str.address, sizeof(str.address));
+        port = ntohs(addr_in->sin_port);
+    } else if (ss->ss_family == AF_INET6) {
+        struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)ss;
+        paddress = inet_ntop(AF_INET6, &(addr_in6->sin6_addr), str.address, sizeof(str.address));
+        port = ntohs(addr_in6->sin6_port);
+    } else {
+        fprintf(stderr, "Unknown address family: %d\n", ss->ss_family);
+        exit(EXIT_FAILURE);
+    }
+
+    if (paddress == NULL) {
+        perror("inet_ntop");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("coming from port %d\n", port);
+
+    status = snprintf(str.port, MAX_PORT_LEN, "%u", port);
+    if (status < 0 || status >= MAX_PORT_LEN) {
+        fprintf(stderr, "snprintf error or truncation\n");
+    }
+
+    return str;
+}
+
 /* recv's into *out, returns recv'd nbytes on success, on failure/disconnect -1, on timeout -2 */
 ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
     if (out == NULL || out_size == 0) {
@@ -107,6 +163,7 @@ struct clientopts {
  
     sa_family_t family;     // address family  AF_INET, AF_INET6
     in_port_t port;         // server port     uint16_t     
+    struct sockaddr_storage caddr; // TODO: migrate to a caddr for ipv4/ipv6 full support
 
     FILE *logfile;          // can be stdin, file, or if UNSPEC: (syslog)
     int verbose;            // verbosity enabled
@@ -161,56 +218,6 @@ int main(int argc, char **argv) {
     }
 
     // now that we have a connected socket we need to loop
-
-    /*while (!stop) {
-        char msg_buffer[MAX_MSG] = {0};
-        memset(&msg_buffer, '\0', sizeof(msg_buffer));
-
-        int n = read_socket(sockfd, msg_buffer, MAX_MSG, 2); // 4 second timeout
-
-        printf("status: %d\n", n);
-        if (n == -1) { // on interrupts ignore this 
-            // error occurred
-            //perror("recvtimeout");
-            stop = 1;
-
-            if (errno != EINTR)
-                perror("recvtimeout");
-            //printf("Interrupt\n");
-        } else if (n == -2) {
-            // timeout
-            //printf("Timeout\n");
-        } else if (n == 0) {
-            printf("Connection forcibly closed by remote host.\n");
-            stop = 1;
-        } else {
-            // got some data in buf
-            printf("%s\n", msg_buffer);
-        }
-
-        // now if the user has input anything send it
-        char send_buffer[MAX_MSG];
-        memset(send_buffer, '\0', sizeof(send_buffer));
-
-        // read into with fgets
-        char *read = NULL;
-
-        if (!stop) {
-            if ((read = fgets(send_buffer, MAX_MSG, stdin)) != NULL) {
-                // send to the server socket
-
-                if (!stop) {
-                    ssize_t bytes_sent = send_socket(sockfd, send_buffer, 0);
-                    if (bytes_sent < 0) {
-                        printf("Failure to send_socket\n");
-                    }
-                }
-            }
-        }
-
-
-        
-    }*/
 
     fd_set readfds;
     struct timeval timeout;

@@ -25,7 +25,7 @@ struct List *create_list() {
 
 
 void echo_list(struct List *lp) {
-   
+ 
     printf("\n");
 
     if (lp->capacity == 0) {
@@ -46,9 +46,12 @@ void echo_list(struct List *lp) {
 
 
 void delete_list(struct List *lp) {
- 
+   
     while (lp->head != NULL && lp->capacity > 0) {
 
+
+        // close socket calls remove_node internally
+        //close_socket(lp->head->connfd); // close the client connections
         remove_node(lp, lp->head);
 
     }
@@ -77,7 +80,7 @@ struct Node *insert_node(struct List *lp) {
         
         // Adding:                vvvvv
         // List: head -> node1 -> node2 -> NULL
-       
+     
         struct Node *current = lp->head;
         while (current->next != NULL)
             current = current->next;
@@ -100,7 +103,7 @@ struct Node *insert_node(struct List *lp) {
 void remove_node(struct List *lp, struct Node *node) {
 
     if (lp->head != node) {
-           
+     
         /* this is a subnode of some sort */
 
         if (node->prev != NULL) { 
@@ -109,28 +112,28 @@ void remove_node(struct List *lp, struct Node *node) {
 
             if (node->next != NULL)
                 node->next->prev = node->prev; 
-                     
+            
             struct Node *current = lp->head;
             while (current->next != NULL)
-                 current = current->next;
+               current = current->next;
 
-            if (current != lp->head)
-                lp->tail = current;   
-            else
-                lp->tail = NULL;
+           if (current != lp->head)
+            lp->tail = current;   
+        else
+            lp->tail = NULL;
 
-        }
+    }
 
-    } else {
+} else {
 
         /* this is the new head of the linked list */
 
         // remove: dead_node1 -> new_head
         // 
 
-        if (lp->head->next != NULL) {
-            lp->head = lp->head->next;
-            
+    if (lp->head->next != NULL) {
+        lp->head = lp->head->next;
+        
             if (lp->tail == lp->head) // last node remaining, remove the tail
                 lp->tail = NULL;
 

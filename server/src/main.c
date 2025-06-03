@@ -63,16 +63,16 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
         switch (c) {
 
-            case '4':
-                svopts->family = AF_INET;
-                break;
+        case '4':
+            svopts->family = AF_INET;
+            break;
 
-            case '6':
-                svopts->family = AF_INET6;
-                break;
+        case '6':
+            svopts->family = AF_INET6;
+            break;
 
-            case 'E':
-                fprintf(stdout, "Logging to %s\n", optarg);
+        case 'E':
+            fprintf(stdout, "Logging to %s\n", optarg);
                 // TODO check access(), if not stdin, close(logfile) [verify file]
 
                 /*  TODO add logging library, set log mode by verbosity
@@ -85,61 +85,61 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
                 // lets say i want to log to stderr and STREAM, its quite a common task isnt it
 
-                break;
+            break;
 
-            case 'e':
-                svopts->logfile = stderr;
-                break;
+        case 'e':
+            svopts->logfile = stderr;
+            break;
 
-            case 'v':
-                svopts->verbose = 1;
-                break;
+        case 'v':
+            svopts->verbose = 1;
+            break;
 
-            case 'h':
-                usage(EXIT_SUCCESS);
-                break;
+        case 'h':
+            usage(EXIT_SUCCESS);
+            break;
 
-            case 'p':
+        case 'p':
 
-                printf("custom port selected\n");
+            printf("custom port selected\n");
                 // TODO atoi fails, returns 0, no way to distingush err
                 // use strtol for increased error output
 
-                int port = atoi(optarg);
-                printf("port: %u\n", port);
+            int port = atoi(optarg);
+            printf("port: %u\n", port);
 
                 // undefined behavior: atoi fails and port equals zero
 
 
                 // TODO binding on port 0 returns a random port number, make this an option?
-                if (port == 0) {
-                    fprintf(stderr, "Invalid port number supplied\n");
-                    return -1;
-                }
+            if (port == 0) {
+                fprintf(stderr, "Invalid port number supplied\n");
+                return -1;
+            }
 
                 // If its under 1034, need root
                 // If its greater than 1034, and not more than 65,535
 
-                if (port < 1034) {
+            if (port < 1034) {
                     // FAIL, requires root privilages
-                    fprintf(stderr, "Ports <= 1034 non-inclusive require elevated privilages\n");
-                    return -1;
-                } else if (port >= 65535) {
-                    fprintf(stderr, "Port must be between 0 and 65535 inclusive\n");
-                    return -1;
-                } else {
-                    fprintf(stdout, "changing port to %s\n", optarg);
-                    svopts->port = port;
-                }
+                fprintf(stderr, "Ports <= 1034 non-inclusive require elevated privilages\n");
+                return -1;
+            } else if (port >= 65535) {
+                fprintf(stderr, "Port must be between 0 and 65535 inclusive\n");
+                return -1;
+            } else {
+                fprintf(stdout, "changing port to %s\n", optarg);
+                svopts->port = port;
+            }
 
-                break;
+            break;
 
-            case '?':
-                usage(EXIT_FAILURE);
-                break;
+        case '?':
+            usage(EXIT_FAILURE);
+            break;
 
-            default:
-                exit(EXIT_FAILURE);
+        default:
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -186,11 +186,11 @@ int main(int argc, char **argv) {
 
        poll_server(&srv, &svopts, 1000);    // interval constant interval (#define here)
 
-    }
+   }
 
-    shutdown_server(&srv);
+   shutdown_server(&srv);
 
-    return 0;
+   return 0;
 }
 
 

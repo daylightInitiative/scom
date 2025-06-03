@@ -8,6 +8,8 @@
 #define HOSTADDR "127.0.0.1" //"127.0.0.1" // localhost INADDR_LOOPBACK
 #define HOSTPORT 4444
 
+// protocol codes
+#define SERVER_SHUTDOWN "SERVER_SHUTDOWN\n"
 
 #define MAX_PORT_LEN 10 // 65535
 
