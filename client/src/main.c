@@ -21,6 +21,8 @@
 #include <time.h>
 #include <netdb.h>
 
+#include "log.h"
+
 #define MAX_MSG 512
 
 // goal: connect to the server
@@ -180,6 +182,7 @@ int main(int argc, char **argv) {
 
     if (sockfd < 0) {
         fprintf(stderr, "Failure to create socket\n");
+        perror("socket");
         exit(1);
     }
 
@@ -214,9 +217,11 @@ int main(int argc, char **argv) {
     status = connect(sockfd, (struct sockaddr *)&srvaddr, addrlen);
     if (status < 0) {
         fprintf(stderr, "Failed to connect\n");
+        perror("connect");
         exit(1);
     }
 
+    logfmt(stdout, INFO, "Hello, test message: %s", "aaaaa");
     // now that we have a connected socket we need to loop
 
     fd_set readfds;
@@ -233,7 +238,7 @@ int main(int argc, char **argv) {
         int maxfd = sockfd > STDIN_FILENO ? sockfd : STDIN_FILENO;
         int activity = select(maxfd + 1, &readfds, NULL, NULL, &timeout);
 
-        if (activity < 0) {
+        if (activity < 0 && errno != EINTR) {
             perror("select");
             stop = 1;
             break;
