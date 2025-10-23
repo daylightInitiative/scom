@@ -1,6 +1,9 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <time.h>
+#include <sys/time.h>
+#include <string.h>
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -55,12 +58,29 @@ int logfmt(FILE *fd, LogLevel level, const char *fmt, ...) {
     const char *logLevel = getLogLevel(level);
     const char *logColor = getLevelColor(level);
 
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    struct tm *tm_info = localtime(&tv.tv_sec);
+    char time_buffer[64];
+    memset(time_buffer, '\0', sizeof(time_buffer));
+
+    strftime(time_buffer, sizeof(time_buffer), LOG_TIME_FORMAT, tm_info);
+
+    int required_size = snprintf(NULL, 0, "%s.%03ld", time_buffer, tv.tv_usec / 1000);
+    size_t timestamp_size = (required_size + 1);
+
+    char timestamp[timestamp_size];
+    memset(timestamp, '\0', sizeof(timestamp));
+
+    snprintf(timestamp, timestamp_size, "%s.%03ld", time_buffer, tv.tv_usec / 1000);
+
     // this is a file not a stream, no colors
     if (is_regular) {
-        fprintf(fd, "[%s] ", logLevel);
+        fprintf(fd, "%s - [%s] ", timestamp, logLevel);
         vfprintf(fd, fmt, args);
     } else {
-        fprintf(fd, "%s[%s] ", logColor, logLevel);
+        fprintf(fd, "%s%s - [%s] ", logColor, timestamp, logLevel);
         vfprintf(fd, fmt, args);
         fprintf(fd, "%s\n", COLOR_RESET);
     }

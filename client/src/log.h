@@ -1,6 +1,7 @@
 #ifndef SCOM_CLIENT_LOG_H
 #define SCOM_CLIENT_LOG_H
 
+#define LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
 #define COLOR_RESET "\033[0m"
 
 #define LOG_LEVEL_LIST \
