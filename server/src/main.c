@@ -148,6 +148,8 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
     argv += optind;
 
     /* . . . */
+    /* now lets get the host we're trying to connect to or use the default configured one */
+    
 
     return 0;
 }

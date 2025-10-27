@@ -270,64 +270,64 @@ int init_server(struct server *srv, struct serveropts *svopts) {
         struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr((struct sockaddr *)&srv->saddr); 
 
         addrinfo->sin_family = AF_INET;
-            addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);      // htonl (INADDR_ANY) is required here.
-            addrinfo->sin_port = htons(svopts->port);
+        addrinfo->sin_addr.s_addr = htonl(INADDR_ANY);      // htonl (INADDR_ANY) is required here.
+        addrinfo->sin_port = htons(svopts->port);
 
-            int bind_status = bind(srv->sockfd, (struct sockaddr *)addrinfo, sizeof(*addrinfo));
+        int bind_status = bind(srv->sockfd, (struct sockaddr *)addrinfo, sizeof(*addrinfo));
 
-            if (bind_status < 0) {
-                perror("bind");
-                return -1;
-            }
-            
-            printf("server listening on %s\n", inet_ntoa(addrinfo->sin_addr));
-            
-            
-            struct ipstr ipaddr = get_ip_str(&srv->saddr);
-            fprintf(stdout, "Server Listening on %s:%s\n", ipaddr.address, ipaddr.port);
-
-
-
-            socklen_t len = 0;
-            struct sockaddr_storage srvaddr = {0};
-            char ipstrs[INET_ADDRSTRLEN] = {0};
-            int port = 0;
-            
-            printf("receiving sockname\n");     
-            len = sizeof(srvaddr);
-            int ret = getsockname(srv->sockfd, (struct sockaddr *)&srvaddr, &len);
-
-            if (ret < 0) {
-                perror("getpeername");
-            }
-
-            if (srvaddr.ss_family == AF_INET) {
-                printf("Connection normal\n");
-                struct sockaddr_in *s = (struct sockaddr_in *)&srvaddr;
-                port = ntohs(s->sin_port);
-                inet_ntop(AF_INET, &s->sin_addr, ipstrs, sizeof(ipstrs));
-            } else {
-                // IPv6
-                printf("Handling IPv6 connection\n");
-            }
+        if (bind_status < 0) {
+            perror("bind");
+            return -1;
+        }
+        
+        printf("server listening on %s\n", inet_ntoa(addrinfo->sin_addr));
+        
+        
+        struct ipstr ipaddr = get_ip_str(&srv->saddr);
+        fprintf(stdout, "Server Listening on %s:%s\n", ipaddr.address, ipaddr.port);
 
 
 
-            // Instead of making two whole functions for both connected client and server
-            // why dont we just have two wrappers over a DRY interface
-            printf("=====================================\n");
-            printf("Server sock name: %s:%d\n", ipstrs, port);
+        socklen_t len = 0;
+        struct sockaddr_storage srvaddr = {0};
+        char ipstrs[INET_ADDRSTRLEN] = {0};
+        int port = 0;
+        
+        printf("receiving sockname\n");     
+        len = sizeof(srvaddr);
+        int ret = getsockname(srv->sockfd, (struct sockaddr *)&srvaddr, &len);
 
-            // Lets rememeber that 0.0.0.0 means its listening from connections on all interfaces (ips)
+        if (ret < 0) {
+            perror("getpeername");
+        }
 
-            //INADDR_LOOPBACK (127.0.0.1)
-              //        always refers to the local host via the loopback device;
+        if (srvaddr.ss_family == AF_INET) {
+            printf("Connection normal\n");
+            struct sockaddr_in *s = (struct sockaddr_in *)&srvaddr;
+            port = ntohs(s->sin_port);
+            inet_ntop(AF_INET, &s->sin_addr, ipstrs, sizeof(ipstrs));
+        } else {
+            // IPv6
+            printf("Handling IPv6 connection\n");
+        }
 
-           //INADDR_ANY (0.0.0.0)
-            //      means any address for socket binding;
 
 
-            break;
+        // Instead of making two whole functions for both connected client and server
+        // why dont we just have two wrappers over a DRY interface
+        printf("=====================================\n");
+        printf("Server sock name: %s:%d\n", ipstrs, port);
+
+        // Lets rememeber that 0.0.0.0 means its listening from connections on all interfaces (ips)
+
+        //INADDR_LOOPBACK (127.0.0.1)
+            //        always refers to the local host via the loopback device;
+
+        //INADDR_ANY (0.0.0.0)
+        //      means any address for socket binding;
+
+
+        break;
 
         case AF_INET6:
             fprintf(stderr, "IPv6 is currently not supported.\n");

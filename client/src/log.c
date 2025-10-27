@@ -43,6 +43,11 @@ const char *getLogLevel(LogLevel level) {
 // its important to va_args to have the last named argument here fmt or whatever we use
 int logfmt(FILE *fd, LogLevel level, const char *fmt, ...) {
 
+    // eventually we'll read from a json file or some kind of config file
+    if (level < CURRENT_LOG_LEVEL) {
+        return 0;
+    }
+
     struct stat sb;
     int stream_fd = fileno(fd);
     if (fstat(stream_fd, &sb) < 0) {

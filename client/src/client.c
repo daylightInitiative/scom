@@ -73,7 +73,6 @@ ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
         return -1;
     }
 
-
     memset(out, 0, out_size);
 
     ssize_t nbytes = recv(sockfd, out, out_size - 1, flags);
@@ -100,10 +99,6 @@ ssize_t send_socket(int sockfd, char *in, int flags) {
     char sent[MAX_MSG];
     
     memset(sent, '\0', MAX_MSG);
-    //strncat(sent, in, MAX_MSG - 1);        // TODO: MAX_MSG - 2 Enforce \n
-                                            // TODO: strip user added \n's
-
-    // instead of strncat use a more secure function like snprintf()
     int written = snprintf(sent, MAX_MSG, "%s", in);
     if (written < 0 || written >= MAX_MSG) {
         logfmt(stderr, ERROR, "snprintf errored or truncation\n");

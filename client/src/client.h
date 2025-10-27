@@ -2,6 +2,7 @@
 #define SCOM_CLIENT_H
 
 #define MAX_PORT_LEN 10 // 65535
+#define HOSTPORT 4444
 #define MAX_MSG 512
 
 

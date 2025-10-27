@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -34,18 +35,141 @@ volatile sig_atomic_t stop;
 void sigint_handler(int signo) {
     stop = 1;
 
-    // Close stdin to force fgets to return
-    fclose(stdin);
+    // TBD fclose or non blocking fgets
+    // fclose(stdin);
 
-    logfmt(stderr, WARN, "[!] SIGINT received. Exiting...\n");
+    write(STDOUT_FILENO, "\n[!] SIGINT received. Exiting...\n", 33);
 }
 
+void usage(int status) {
 
+    puts("\nUsage: scom [ OPTIONS... ] [ FILE... ]\n");
+    puts("\nOptions: ");
+    puts(" -4\tforces scomd to use IPv4 addresses only.");
+    puts(" -6\tforces scomd to use IPv6 addresses only.");
+    puts(" -e\twrite debug logs to standard error instead of the system log.");
+    puts(" -p\tspecify what port to listen on");
+    puts(" -h\tdisplay this help message");
+    puts(" -v\tproduce more verbose output");
+
+    exit(status);
+}
+
+int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
+
+    memset(svopts, 0, sizeof(struct clientopts));
+
+    int c;
+
+    /* getopts:
+
+        -4      support only ipv4 connections
+        -6      support only ipv6 connections
+        -E      write debug logs to selected file instead of stderr
+        -e      write debug logs to standard error instead of the system log.
+        -p      set server to listen on <PORT>
+        -v      set higher verbosity
+        -h      displays this help message
+
+
+    */
+
+    svopts->verbose = false;
+    svopts->family = AF_INET; // change to AF_UNSPEC later?
+    svopts->port = HOSTPORT;
+    svopts->logfile = NULL;
+
+    while ((c = getopt(argc, argv, "46vheE:p:")) != -1) {
+
+        switch (c) {
+
+        case '4':
+            svopts->family = AF_INET;
+            break;
+
+        case '6':
+            svopts->family = AF_INET6;
+            break;
+
+        case 'E':
+            fprintf(stdout, "Logging to %s\n", optarg);
+                // TODO check access(), if not stdin, close(logfile) [verify file]
+
+                /*  TODO add logging library, set log mode by verbosity
+                // TODO echo to stdout and logfile bitmask
+                if (!file_exists) {
+                    svopts->logfile = (FILE *)fopen(optarg, "w");
+
+                    if (svopts->logfile 
+                }*/
+
+                // lets say i want to log to stderr and STREAM, its quite a common task isnt it
+
+            break;
+
+        case 'e':
+            svopts->logfile = stderr;
+            break;
+
+        case 'v':
+            svopts->verbose = 1;
+            break;
+
+        case 'h':
+            usage(EXIT_SUCCESS);
+            break;
+
+        case 'p':
+
+            printf("custom port selected\n");
+                // TODO atoi fails, returns 0, no way to distingush err
+                // use strtol for increased error output
+
+            int port = atoi(optarg);
+            printf("port: %u\n", port);
+
+            // TODO binding on port 0 returns a random port number, make this an option?
+            if (port == 0) {
+                fprintf(stderr, "Invalid port number supplied\n");
+                return -1;
+            }
+
+            // connecting doesnt necessarily need root
+            svopts->port = port;
+
+            break;
+
+        case '?':
+            usage(EXIT_FAILURE);
+            break;
+
+        default:
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* remove getopt options */
+    argc -= optind;
+    argv += optind;
+
+    /* . . . */
+
+    return 0;
+}
 
 
 int main(int argc, char **argv) {
 
     signal(SIGINT, sigint_handler);
+
+    struct clientopts cliopts = {0};
+
+    int ret = parse_network_args(argc, argv, &cliopts);
+
+    if (ret < 0) {
+        fprintf(stderr, "Failure to parse network arguments\n");
+        exit(EXIT_FAILURE);
+    }
 
     int sockfd = -1;
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -69,10 +193,6 @@ int main(int argc, char **argv) {
     memset(&srvaddr, '\0', sizeof(srvaddr));
 
     // allocate client opts to be filled in by cla
-    struct clientopts cliopts;
-    memset(&cliopts, '\0', sizeof(cliopts));
-    cliopts.port = 4444;
-
     srvaddr.sin_family = AF_INET; // for right now ipv4 is hard coded later will be getopts
     srvaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     srvaddr.sin_port = htons(cliopts.port);
@@ -102,6 +222,10 @@ int main(int argc, char **argv) {
     timeout.tv_sec = 2;  // Set timeout value
     timeout.tv_usec = 0;
 
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+    //Set stdin flag;s to non blocking, so we can break the select call
+
     while (!stop) {
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds); // Set socket fd for reading
@@ -111,7 +235,7 @@ int main(int argc, char **argv) {
         int maxfd = sockfd > STDIN_FILENO ? sockfd : STDIN_FILENO;
         int activity = select(maxfd + 1, &readfds, NULL, NULL, &timeout);
 
-        if (activity < 0 && errno != EINTR) {
+        if (activity < 0 && errno != EINTR && errno != EAGAIN) {
             perror("select");
             stop = 1;
             break;
