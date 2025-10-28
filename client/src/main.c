@@ -23,6 +23,7 @@
 #include <netdb.h>
 
 #include "client.h"
+#include "cmds.h"
 #include "log.h"
 
 
@@ -122,8 +123,8 @@ int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
         case 'p':
 
             printf("custom port selected\n");
-                // TODO atoi fails, returns 0, no way to distingush err
-                // use strtol for increased error output
+            // TODO atoi fails, returns 0, no way to distingush err
+            // use strtol for increased error output
 
             int port = atoi(optarg);
             printf("port: %u\n", port);
@@ -157,10 +158,16 @@ int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
     return 0;
 }
 
+void cleanup_objects() {
+    cleanup_logger();
+}
 
 int main(int argc, char **argv) {
 
     signal(SIGINT, sigint_handler);
+    atexit(cleanup_objects);
+    init_default_logger(NULL);
+    // TODO: add a atexit signal catch for SIGSEGV and SIGABRT etc, to clean up resources especially on the server.
 
     struct clientopts cliopts = {0};
 
@@ -246,10 +253,10 @@ int main(int argc, char **argv) {
             char msg_buffer[MAX_MSG] = {0};
             int n = read_socket(sockfd, msg_buffer, MAX_MSG, 0);
             if (n > 0) {
-                printf("Server: %s\n", msg_buffer);
+                logfmt(stdout, DEBUG, "Server: %s\n", msg_buffer);
             }
             else if (n == 0) {
-                printf("Server closed the connection.\n");
+                logfmt(stdout, WARN, "[!] Server closed the connection.\n");
                 break;
             }
         }
@@ -257,10 +264,20 @@ int main(int argc, char **argv) {
         if (FD_ISSET(STDIN_FILENO, &readfds)) {
             // Handle user input from stdin
             char send_buffer[MAX_MSG] = {0};
+            memset(send_buffer, 0, sizeof(send_buffer));
+
+            char cmd_buffer[MAX_MSG] = {0};
+            memset(cmd_buffer, 0, sizeof(cmd_buffer));
+
             if (fgets(send_buffer, MAX_MSG, stdin) != NULL) {
-                ssize_t bytes_sent = send_socket(sockfd, send_buffer, 0);
-                if (bytes_sent < 0) {
-                    logfmt(stderr, ERROR, "Failure to send_socket");
+                strncpy(cmd_buffer, send_buffer, MAX_MSG);
+                cmd_buffer[strcspn(cmd_buffer, "\n")] = '\0';
+                // returns 1 on no command detected, 0 on successful execution
+                if (run_command(cmd_buffer) > 0) {
+                    ssize_t bytes_sent = send_socket(sockfd, send_buffer, 0);
+                    if (bytes_sent < 0) {
+                        logfmt(stderr, ERROR, "Failure to send_socket");
+                    }
                 }
             }
         }
@@ -273,6 +290,7 @@ int main(int argc, char **argv) {
 
     logfmt(stdout, INFO, "Closing socket...");
 
+    cleanup_logger();
     close(sockfd);
 
     return 0;

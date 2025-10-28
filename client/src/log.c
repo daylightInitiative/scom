@@ -1,16 +1,29 @@
 
 #include <stdio.h>
+#include <stdlib.h>
+
 #include <stdarg.h>
 #include <time.h>
 #include <sys/time.h>
 #include <string.h>
 
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #include "log.h"
 
 // this way its easy to add new log levels
+
+static LoggerConfig *defaultLogger = NULL;
+
+
+
+#define X(name) #name,
+const char *level_names[] = {
+    LOG_LEVEL_LIST
+};
+#undef X
 
 const char *color_codes[] = {
     "\033[94;20m",
@@ -19,12 +32,6 @@ const char *color_codes[] = {
     "\033[31;20m",
     "\033[31;1m"
 };
-
-#define X(name) #name,
-const char *level_names[] = {
-    LOG_LEVEL_LIST
-};
-#undef X
 
 const char *getLevelColor(LogLevel level) {
     if (level >= 0 && level < LOG_COUNT) {
@@ -40,11 +47,76 @@ const char *getLogLevel(LogLevel level) {
     return "INFO";
 }
 
+const char *get_timestamp(void) {
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    struct tm *tm_info = localtime(&tv.tv_sec);
+    char time_buffer[64];
+    memset(time_buffer, '\0', sizeof(time_buffer));
+    strftime(time_buffer, sizeof(time_buffer), LOG_TIME_FORMAT, tm_info);
+
+    static char timestamp[128]; // i'm pretty sure we can spare 8000 years
+    memset(timestamp, '\0', sizeof(timestamp));
+    snprintf(timestamp, sizeof(timestamp), "%s.%03ld", time_buffer, tv.tv_usec / 1000);
+
+    return timestamp;
+}
+
+int init_default_logger(LoggerConfig *config_override) {
+
+    if (config_override) {
+        defaultLogger = config_override;
+        return 0;
+    }
+
+    if (defaultLogger == NULL) {
+        
+        // lets create the file
+        LoggerConfig *lc = malloc(sizeof(LoggerConfig));
+        memset(lc, '\0', sizeof(LoggerConfig));
+
+        lc->loggerLevel = DEFAULT_LOG_LEVEL;
+        lc->logFile = fopen(DEFAULT_LOG_FILE_PATH, "w");
+        if (!lc->logFile) {
+            perror("fopen");
+            return -1;
+        }
+
+        const char *loggingStarted = get_timestamp();
+        fprintf(lc->logFile, "\n%s [INFO] Logging started.\n", loggingStarted);
+        fflush(lc->logFile);
+
+        defaultLogger = lc;
+    }
+
+    return 0;
+}
+
+void cleanup_logger() {
+    if (defaultLogger != NULL) {
+        if (defaultLogger->logFile) {
+            fclose(defaultLogger->logFile);
+            defaultLogger->logFile = NULL;
+        }
+
+        free(defaultLogger);
+        defaultLogger = NULL;
+    }
+}
+
+
 // its important to va_args to have the last named argument here fmt or whatever we use
 int logfmt(FILE *fd, LogLevel level, const char *fmt, ...) {
 
+    if (defaultLogger == NULL) {
+        fprintf(stderr, "Logger is not initialized/allocated did you forget to call init_default_logger?\n");
+        return 1;
+    }
+
     // eventually we'll read from a json file or some kind of config file
-    if (level < CURRENT_LOG_LEVEL) {
+    if (level < defaultLogger->loggerLevel) {
         return 0;
     }
 
@@ -63,22 +135,7 @@ int logfmt(FILE *fd, LogLevel level, const char *fmt, ...) {
     const char *logLevel = getLogLevel(level);
     const char *logColor = getLevelColor(level);
 
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-
-    struct tm *tm_info = localtime(&tv.tv_sec);
-    char time_buffer[64];
-    memset(time_buffer, '\0', sizeof(time_buffer));
-
-    strftime(time_buffer, sizeof(time_buffer), LOG_TIME_FORMAT, tm_info);
-
-    int required_size = snprintf(NULL, 0, "%s.%03ld", time_buffer, tv.tv_usec / 1000);
-    size_t timestamp_size = (required_size + 1);
-
-    char timestamp[timestamp_size];
-    memset(timestamp, '\0', sizeof(timestamp));
-
-    snprintf(timestamp, timestamp_size, "%s.%03ld", time_buffer, tv.tv_usec / 1000);
+    const char *timestamp = get_timestamp();
 
     // this is a file not a stream, no colors
     if (is_regular) {
