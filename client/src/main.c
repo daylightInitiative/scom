@@ -22,7 +22,7 @@
 #include <time.h>
 #include <netdb.h>
 
-#include "client.h"
+#include "../shared/net.h"
 #include "cmds.h"
 #include "log.h"
 

@@ -1,4 +1,4 @@
-TARGET=scomd
+TARGET=scom
 ALIAS=scomd
 CC=gcc
 
@@ -6,15 +6,22 @@ SRC_PATH=src
 OBJ_PATH=obj
 BIN_PATH=bin
 
+SHARED_DIR = ../shared
+SHARED_LIB = $(SHARED_DIR)/bin/libshared.a
+
 SRC=$(foreach x, $(SRC_PATH), $(wildcard $(addprefix $(x)/*,.c*)))
 OBJS=$(addprefix $(OBJ_PATH)/, $(addsuffix .o, $(notdir $(basename $(SRC)))))
 
-INCLUDES=
-CFLAGS=-O0 -Wall -Wextra  -pedantic -ggdb $(INCLUDES)
+INCLUDES = -I$(SHARED_DIR)
+CFLAGS=-O0 -Wall -Wextra -pedantic -ggdb $(INCLUDES)
 ##-Wall -Wextra -g $(INCLUDES)
-LDFLAGS=
+LDFLAGS=$(SHARED_LIB)
 
-all: $(BIN_PATH)/$(TARGET)
+all: $(SHARED_LIB) $(BIN_PATH)/$(TARGET)
+
+$(SHARED_LIB):
+	@echo : BUILDING SHARED LIBRARY
+	@$(MAKE) -C $(SHARED_DIR)
 
 $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 	@mkdir -p $(OBJ_PATH)
@@ -60,4 +67,6 @@ clean:
 	-@rm -rf $(BIN_PATH)/*
 	-@rm -rf ./$(ALIAS)
 	-@rmdir $(BIN_PATH) $(OBJ_PATH)
+	-@rm -rf $(SHARED_DIR)/bin/* $(SHARED_DIR)/obj/*
+	-@rmdir $(SHARED_DIR)/bin $(SHARED_DIR)/obj
 

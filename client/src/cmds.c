@@ -7,9 +7,16 @@
 #include "cmds.h"
 #include "log.h"
 
+void scom_usage(int status) {
+
+    // this should be used for scom shell commands not its arguments
+    fprintf(stdout, "displaying internal commands....\n");
+
+    exit(status);
+}
+
 void cmd_help(int argc, char *argv[]) {
-    printf("Help is on the way!\n");
-    exit(0);
+    scom_usage(0);
 }
 
 void cmd_exit(int argc, char *argv[]) {

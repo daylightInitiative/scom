@@ -2,6 +2,8 @@
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
         "types.h": "c",
-        "cmds.h": "c"
+        "cmds.h": "c",
+        "client.h": "c",
+        "errno.h": "c"
     }
 }

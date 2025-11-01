@@ -11,13 +11,6 @@
 // protocol codes
 #define SERVER_SHUTDOWN "SERVER_SHUTDOWN\n"
 
-#define MAX_PORT_LEN 10 // 65535
-
-struct ipstr {
-    char address[INET_ADDRSTRLEN];
-    char port[MAX_PORT_LEN + 1];
-};
-
 #define MAX_MSG      512
 #define MAX_CLIENTS  24
 
