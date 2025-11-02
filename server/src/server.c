@@ -37,6 +37,72 @@ void add_epoll_watch(int epollfd, int fd, void *data, int events)
     }
 }
 
+/* recv's into *out, returns recv'd nbytes on success, upon failure to read of 0, returns -1 */
+ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
+    if (out == NULL || out_size == 0) {
+        fprintf(stderr, "read_socket: invalid buffer\n");
+        return -1;
+    }
+
+
+    memset(out, 0, out_size);
+
+    // the server recv_socket is slightly different
+    ssize_t nbytes = recv(sockfd, out, out_size - 1, flags);
+    if (nbytes < 0) {
+        perror("recv");
+        return -1;
+    } else if (nbytes == 0) {
+        return -1;  // client disconnect
+    }
+
+    // cut the string off (we read in out_size - 1)
+    out[nbytes] = '\0';
+
+    printf("received %ld bytes on socket %d\n", nbytes, sockfd);
+    return nbytes;
+}
+
+
+
+/* copies string literal *in and sends it, returns sent nbytes on success, on failure returns -1 */
+ssize_t send_socket(int sockfd, char *in, int flags) {
+    
+    ssize_t nbytes = 0;
+    char sent[MAX_MSG];
+    
+    memset(sent, '\0', MAX_MSG);
+    //strncat(sent, in, MAX_MSG - 1);        // TODO: MAX_MSG - 2 Enforce \n
+                                            // TODO: strip user added \n's
+
+    // its safer to use snprintf()
+    int written = snprintf(sent, MAX_MSG, "%s", in);
+    if (written < 0 || written >= MAX_MSG) {
+        fprintf(stderr, "snprintf errored or truncation\n");
+        return -1;
+    }
+
+    size_t sent_size = strlen(sent);
+    nbytes = send(sockfd, sent, sent_size, flags);
+
+    if (nbytes < 0) {
+
+        if (nbytes == ECONNRESET) { 
+            printf("conn %d: forcibly closed the connection\n", sockfd);
+        } else {
+            perror("send");
+        }
+        return -1;
+    } else if (nbytes == 0) {
+        return -1;
+    }
+
+    printf("sent %ld bytes to %d\n", nbytes, sockfd);
+    printf("raw: %s", sent);
+
+    return nbytes;
+}
+
 int close_socket(struct Node *client, struct server *srv)
 {
 

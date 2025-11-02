@@ -26,7 +26,6 @@ struct clientopts {
 void *get_in_addr(struct sockaddr *sa);
 struct ipstr get_ip_str(struct sockaddr_storage *ss);
 
-ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags);
-ssize_t send_socket(int sockfd, char *in, int flags);
+// read_socket and send_socket have slightly different implementations, so omitting them here
 
 #endif

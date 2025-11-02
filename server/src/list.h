@@ -1,6 +1,6 @@
 
-#ifndef SCOM_LIST_H
-#define SCOM_LIST_H
+#ifndef SCOMD_LIST_H
+#define SCOMD_LIST_H
 
 #include <netinet/in.h>
 #include <sys/socket.h>

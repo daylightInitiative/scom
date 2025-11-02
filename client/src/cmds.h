@@ -1,5 +1,5 @@
-#ifndef SCOM_CMDS_H
-#define SCOM_CMDS_H
+#ifndef SCOMD_CMDS_H
+#define SCOMD_CMDS_H
 
 #define CMD_PREFIX '/' // worst bug i ever had
 #define MAX_TOKENS 16

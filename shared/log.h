@@ -1,10 +1,14 @@
-#ifndef SCOM_CLIENT_LOG_H
-#define SCOM_CLIENT_LOG_H
+#ifndef SCOM_SHARED_LOG_H
+#define SCOM_SHARED_LOG_H
 
 #define DEFAULT_LOG_LEVEL DEBUG
-#define DEFAULT_LOG_FILE_PATH "../client.log"
+#define DEFAULT_LOG_IDENTIFIER "default"
+#define DEFAULT_LOG_FILE_PATH "../output.log"
 #define LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
 #define COLOR_RESET "\033[0m"
+
+#include <stddef.h>
+#include <stdbool.h>
 
 #define LOG_LEVEL_LIST \
     X(DEBUG)      \
@@ -22,6 +26,9 @@ typedef enum {
 
 typedef struct {
     LogLevel loggerLevel;
+    const char *identifier;  // identifier to be used will display with the log messages
+    const char *log_file_path; // defaults to output.log if it isnt set
+    bool is_regular_file;
     FILE *logFile;
 } LoggerConfig;
 

@@ -4,6 +4,7 @@
         "types.h": "c",
         "cmds.h": "c",
         "client.h": "c",
-        "errno.h": "c"
+        "errno.h": "c",
+        "stdbool.h": "c"
     }
 }

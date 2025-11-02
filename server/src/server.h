@@ -1,6 +1,6 @@
 
-#ifndef SCOM_SERVER_H
-#define SCOM_SERVER_H
+#ifndef SCOMD_SERVER_H
+#define SCOMD_SERVER_H
 
 #include <netinet/in.h>
 #include "list.h"

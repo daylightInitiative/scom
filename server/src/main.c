@@ -8,6 +8,7 @@
 
 #include <signal.h>
 
+#include "../shared/log.h"
 #include "server.h"
 
 volatile sig_atomic_t stop;
@@ -162,6 +163,14 @@ int main(int argc, char **argv) {
 
     signal(SIGINT, sigint_handler);
 
+    LoggerConfig cfg = {
+        .identifier = "SERVER",
+        .loggerLevel = DEBUG,
+        .log_file_path = "../server.log"
+    };
+
+    init_default_logger(&cfg);
+
     // TODO: handle other signals
 
     int status = -1;
@@ -173,14 +182,14 @@ int main(int argc, char **argv) {
     ret = parse_network_args(argc, argv, &svopts);
 
     if (ret < 0) {
-        fprintf(stderr, "Failure to parse network arguments\n");
+        logfmt(stderr, CRITICAL, "Failure to parse network arguments\n");
         exit(EXIT_FAILURE);
     }
     
     status = init_server(&srv, &svopts);
 
     if (status < 0) {
-        fprintf(stderr, "Failure to initialize server\n");
+        logfmt(stderr, CRITICAL, "Failure to initialize server\n");
         exit(EXIT_FAILURE);
     }
 
@@ -191,6 +200,7 @@ int main(int argc, char **argv) {
    }
 
    shutdown_server(&srv);
+   cleanup_logger();
 
    return 0;
 }

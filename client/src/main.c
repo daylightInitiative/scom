@@ -158,15 +158,17 @@ int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
     return 0;
 }
 
-void cleanup_objects() {
-    cleanup_logger();
-}
-
 int main(int argc, char **argv) {
 
     signal(SIGINT, sigint_handler);
-    atexit(cleanup_objects);
-    init_default_logger(NULL);
+
+    LoggerConfig cfg = {
+        .identifier = "CLIENT",
+        .loggerLevel = DEBUG,
+        .log_file_path = "../client.log"
+    };
+
+    init_default_logger(&cfg);
     // TODO: add a atexit signal catch for SIGSEGV and SIGABRT etc, to clean up resources especially on the server.
 
     struct clientopts cliopts = {0};
