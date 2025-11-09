@@ -3,6 +3,6 @@
 
 // server command evaluator
 
-
+#include "../shared/run_cmd.h"
 
 #endif

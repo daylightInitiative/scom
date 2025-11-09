@@ -1,2 +1,4 @@
+2025-11-08 19:56:24.020 - CLIENT - [INFO] Attempting to connect to 127.0.0.1:4444
+2025-11-08 19:56:24.025 - CLIENT - [DEBUG] Connected successfully.
+2025-11-08 19:56:26.838 - CLIENT - [ERROR] Unknown command: hello
 
-2025-10-30 23:09:08.180 [INFO] Logging started.

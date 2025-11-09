@@ -173,7 +173,7 @@ void cleanup_logger() {
 
 
 // its important to va_args to have the last named argument here fmt or whatever we use
-int logfmt(FILE *fd, LogLevel level, const char *fmt, ...) {
+int _logfmt_internal(const char *filename, const int lineno, const char *func_name, FILE *fd, LogLevel level, const char *fmt, ...) {
 
     if (defaultLogger == NULL) {
         fprintf(stderr, "Logger is not initialized/allocated did you forget to call init_default_logger?\n");
@@ -185,10 +185,11 @@ int logfmt(FILE *fd, LogLevel level, const char *fmt, ...) {
         return 0;
     }
 
-    
-
     va_list args;
     va_start(args, fmt);
+
+    va_list fileargs;
+    va_copy(fileargs, args);
     
     const char *logLevel = getLogLevel(level);
     const char *logColor = getLevelColor(level);
@@ -198,17 +199,18 @@ int logfmt(FILE *fd, LogLevel level, const char *fmt, ...) {
     char identifier[64];
     memset(identifier, '\0', sizeof(identifier));
 
-    if (defaultLogger->identifier) {
-        size_t len = strnlen(defaultLogger->identifier, sizeof(identifier) - 1);
+    // address of the string to copy
+    char *identifier_string = DEFAULT_LOG_FILE_PATH;
 
-        // its faster to use memcpy here since we dont need any formatting
-        memcpy(identifier, defaultLogger->identifier, len);
-        identifier[len] = '\0';
-    } else {
-        size_t len = strnlen(DEFAULT_LOG_IDENTIFIER, sizeof(identifier) - 1);
-        memcpy(identifier, DEFAULT_LOG_IDENTIFIER, len);
-        identifier[len] = '\0';
+    if (defaultLogger->identifier) {
+        identifier_string = defaultLogger->identifier;
     }
+
+    size_t len = strnlen(identifier_string, sizeof(identifier) - 1);
+
+    // its faster to use memcpy here since we dont need any formatting
+    memcpy(identifier, identifier_string, len);
+    identifier[len] = '\0';
 
     // this is a file not a stream, no colors
     // instead of checking the log files status, we need to check the fd regular file
@@ -216,29 +218,27 @@ int logfmt(FILE *fd, LogLevel level, const char *fmt, ...) {
     bool is_regular_file = is_regular_file_or_stream(fd);
 
     if (is_regular_file) {
-        fprintf(fd, "%s - %s - [%s] ", timestamp, identifier, logLevel);
+        fprintf(fd, "%s - %s - [%s] (%s:%d in %s) ", timestamp, identifier, logLevel, filename, lineno, func_name);
         vfprintf(fd, fmt, args);
         fprintf(fd, "\n");
         fflush(fd);
+    } else {
+        fprintf(fd, "%s%s - %s - [%s] (%s:%d in %s) ", logColor, timestamp, identifier, logLevel, filename, lineno, func_name);
+        vfprintf(fd, fmt, args);
+        fprintf(fd, "%s\n", COLOR_RESET);
+        fflush(fd);
 
         if (defaultLogger->logFile && fd != defaultLogger->logFile) {
-            va_list fileargs;
-            va_copy(fileargs, args);
             fprintf(defaultLogger->logFile, "%s - %s - [%s] ", timestamp, identifier, logLevel);
             vfprintf(defaultLogger->logFile, fmt, fileargs);
             fprintf(defaultLogger->logFile, "\n");
             fflush(defaultLogger->logFile);
-            va_end(fileargs);
         }
-    } else {
-        fprintf(fd, "%s%s - %s - [%s] ", logColor, timestamp, identifier, logLevel);
-        vfprintf(fd, fmt, args);
-        fprintf(fd, "%s\n", COLOR_RESET);
-        fflush(fd);
     }
 
     fflush(fd);
 
+    va_end(fileargs);
     va_end(args);
 
     return 0;

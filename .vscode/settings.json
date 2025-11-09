@@ -5,6 +5,8 @@
         "cmds.h": "c",
         "client.h": "c",
         "errno.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "stdio.h": "c",
+        "log.h": "c"
     }
 }

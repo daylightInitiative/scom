@@ -1,4 +1,4 @@
-TARGET=scom
+TARGET=scomd
 ALIAS=scomd
 CC=gcc
 

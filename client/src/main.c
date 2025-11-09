@@ -24,12 +24,20 @@
 
 #include "../shared/net.h"
 #include "cmds.h"
+#include "client.h"
 #include "log.h"
 
 
 
 // goal: connect to the server
 // setup commands
+
+Command commands[] = {
+    {"help", "Show available commands", scom_help},
+    {"exit", "Exit the program", scom_exit},
+    {"quit", "Quit the program", scom_exit},
+    {NULL, NULL, NULL} // sentinel
+};
 
 volatile sig_atomic_t stop;
 
@@ -198,25 +206,34 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    struct sockaddr_in srvaddr;
-    memset(&srvaddr, '\0', sizeof(srvaddr));
-
-    // allocate client opts to be filled in by cla
-    srvaddr.sin_family = AF_INET; // for right now ipv4 is hard coded later will be getopts
-    srvaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    srvaddr.sin_port = htons(cliopts.port);
-
-    memcpy(&cliopts.caddr, &srvaddr, sizeof(srvaddr));
+    memset(&cliopts.caddr, '\0', sizeof(struct sockaddr_storage));
     cliopts.caddr.ss_family = AF_INET;
+
+    // now that we've emptied the sockaddr_storage, we need to now branch on IP version
+    if (cliopts.family == AF_INET) {
+
+        struct sockaddr_in *in_addr = (struct sockaddr_in *)&cliopts.caddr;
+
+        in_addr->sin_family = AF_INET; // for right now ipv4 is hard coded later will be getopts
+        in_addr->sin_addr.s_addr = inet_addr("127.0.0.1");
+        in_addr->sin_port = htons(cliopts.port);
+    }
 
     // manually fill the options
 
     struct ipstr ipinfo = get_ip_str(&cliopts.caddr);
     logfmt(stdout, INFO, "Attempting to connect to %s:%s", ipinfo.address, ipinfo.port);
 
-    socklen_t addrlen = sizeof(srvaddr);
+    socklen_t addrlen;
+
+    if (cliopts.family == AF_INET) {
+        addrlen = sizeof(struct sockaddr_in);
+    } else {
+        addrlen = sizeof(struct sockaddr_in6);
+    }
+
     int status = -1;
-    status = connect(sockfd, (struct sockaddr *)&srvaddr, addrlen);
+    status = connect(sockfd, (struct sockaddr *)&cliopts.caddr, addrlen);
     if (status < 0) {
         logfmt(stderr, ERROR, "Failed to connect\n");
         perror("connect");
@@ -275,7 +292,7 @@ int main(int argc, char **argv) {
                 strncpy(cmd_buffer, send_buffer, MAX_MSG);
                 cmd_buffer[strcspn(cmd_buffer, "\n")] = '\0';
                 // returns 1 on no command detected, 0 on successful execution
-                if (run_command(cmd_buffer) > 0) {
+                if (run_command(commands, cmd_buffer) > 0) {
                     ssize_t bytes_sent = send_socket(sockfd, send_buffer, 0);
                     if (bytes_sent < 0) {
                         logfmt(stderr, ERROR, "Failure to send_socket");

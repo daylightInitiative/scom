@@ -19,6 +19,7 @@
 #include <netdb.h>
 
 #include "server.h"
+#include "../shared/log.h"
 #include "../shared/net.h"
 #include "list.h"
 
@@ -179,7 +180,7 @@ int broadcast(struct server *srv, struct Node *sender, char *msg)
 int init_server(struct server *srv, struct serveropts *svopts)
 {
 
-    fprintf(stdout, "initializing server...\n");
+    logfmt(stdout, DEBUG, "initializing server...\n");
 
     srv->clients = create_list();
 
@@ -257,7 +258,7 @@ int init_server(struct server *srv, struct serveropts *svopts)
 
         if (srvaddr.ss_family == AF_INET)
         {
-            printf("Connection normal\n");
+            logfmt(stdout, INFO, "Connection normal\n");
             struct sockaddr_in *s = (struct sockaddr_in *)&srvaddr;
             port = ntohs(s->sin_port);
             inet_ntop(AF_INET, &s->sin_addr, ipstrs, sizeof(ipstrs));

@@ -26,14 +26,19 @@ typedef enum {
 
 typedef struct {
     LogLevel loggerLevel;
-    const char *identifier;  // identifier to be used will display with the log messages
-    const char *log_file_path; // defaults to output.log if it isnt set
+    char *identifier;  // identifier to be used will display with the log messages
+    char *log_file_path; // defaults to output.log if it isnt set
     bool is_regular_file;
     FILE *logFile;
 } LoggerConfig;
 
 // func definitions
-int logfmt(FILE *fd, LogLevel level, const char *fmt, ...);
+// instead of using a complex backtrace() we can just pass the needed informaton using a macro at compile time
+int _logfmt_internal(const char *filename, const int lineno, const char *func_name, FILE *fd, LogLevel level, const char *fmt, ...);
+
+#define logfmt(fd, level, fmt, ...) \
+    _logfmt_internal(__FILE__, __LINE__, __func__, fd, level, fmt, ##__VA_ARGS__) // super fascinating
+
 int init_default_logger(LoggerConfig *config_override);
 void cleanup_logger(void);
 #endif

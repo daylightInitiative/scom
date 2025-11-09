@@ -6,11 +6,6 @@
 #define MAX_MSG 512
 
 
-struct ipstr {
-    char address[INET_ADDRSTRLEN];
-    char port[MAX_PORT_LEN + 1];
-};
-
 
 struct clientopts {
  
@@ -24,7 +19,6 @@ struct clientopts {
 
 // func prototypes
 void *get_in_addr(struct sockaddr *sa);
-struct ipstr get_ip_str(struct sockaddr_storage *ss);
 
 ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags);
 ssize_t send_socket(int sockfd, char *in, int flags);

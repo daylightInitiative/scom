@@ -19,6 +19,7 @@
 #include "client.h"
 #include "log.h"
 
+
 /* recv's into *out, returns recv'd nbytes on success, on failure/disconnect -1, on timeout -2 */
 ssize_t read_socket(int sockfd, char *out, size_t out_size, int flags) {
     if (out == NULL || out_size == 0) {
