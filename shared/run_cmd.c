@@ -9,7 +9,7 @@
 
 
 
-int run_command(Command commands[], char *input) {
+int run_command(Command commands[], char *input, void *userdata) {
     char *argv[MAX_TOKENS];
     int argc = 0;
 
@@ -26,7 +26,7 @@ int run_command(Command commands[], char *input) {
         // pointer arithmetic is interesting...
         // not having to do argv[0] + (sizeof(char) * offset) is quite nice
         if (argv[0][0] == CMD_PREFIX && (strcmp(argv[0] + 1, commands[i].name) == 0)) {
-            commands[i].func(argc, argv);
+            commands[i].func(argc, argv, userdata);
             return 0;
         }
     }

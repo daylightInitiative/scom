@@ -292,12 +292,26 @@ int main(int argc, char **argv) {
                 strncpy(cmd_buffer, send_buffer, MAX_MSG);
                 cmd_buffer[strcspn(cmd_buffer, "\n")] = '\0';
                 // returns 1 on no command detected, 0 on successful execution
-                if (run_command(commands, cmd_buffer) > 0) {
+
+                if (cmd_buffer[0] == CMD_PREFIX) {
+
+                    // if it has a prefix then try to run it
+                    if (run_command(commands, cmd_buffer, NULL) > 0) {
+                        // has the right prefix but isnt a local command
+                        ssize_t bytes_sent = send_socket(sockfd, send_buffer, 0);
+                        if (bytes_sent < 0) {
+                            logfmt(stderr, ERROR, "Failure to send_socket");
+                        }
+                    }
+                } else {
+                    // normal message
                     ssize_t bytes_sent = send_socket(sockfd, send_buffer, 0);
                     if (bytes_sent < 0) {
                         logfmt(stderr, ERROR, "Failure to send_socket");
                     }
                 }
+
+
             }
         }
 

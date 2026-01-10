@@ -4,8 +4,8 @@
 #include "../shared/run_cmd.h"
 
 void scom_usage(int status);
-void scom_help(int argc, char *argv[]);
-void scom_exit(int argc, char *argv[]);
+void scom_help(int argc, char *argv[], void *userdata);
+void scom_exit(int argc, char *argv[], void *userdata);
 
 
 #endif

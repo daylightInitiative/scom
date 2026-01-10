@@ -22,6 +22,13 @@
 #include "../shared/log.h"
 #include "../shared/net.h"
 #include "list.h"
+#include "cmds.h"
+
+Command commands[] = {
+    {"help", "Show available commands", scomd_help},
+    {"nick", "Change your nickname for everyone", scomd_nick},
+    {NULL, NULL, NULL} // sentinel
+};
 
 // https://github.com/yzziizzy/git_webstack/blob/master/src/net.c#L15
 void add_epoll_watch(int epollfd, int fd, void *data, int events)
@@ -396,7 +403,7 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
         else
         {
 
-            if (strlen(client->nickname) > 1)
+            if (strlen(client->nickname) < 1)
             {
 
                 printf("\nServer: %s\n", msg_buffer);
@@ -418,14 +425,20 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
         }
 
         // parse commands here use strtok to get the argument of the command
-        if (strncmp("/nick", msg_buffer, 5) == 0)
-        {
-            printf("Recieved switch\n");
+        // if (strncmp("/nick", msg_buffer, 5) == 0)
+        // {
+        //     printf("Recieved switch\n");
 
-            memset(client->nickname, '\0', sizeof(client->nickname));
-            char *username = "admin";
-            strncpy(client->nickname, username, strlen(username));
-            // client->nickname = "admin";
+        //     memset(client->nickname, '\0', sizeof(client->nickname));
+        //     char *username = "admin";
+        //     strncpy(client->nickname, username, strlen(username));
+        //     // client->nickname = "admin";
+        // }
+
+        // C short circuit evaluation makes this possible
+        if (msg_buffer[0] == CMD_PREFIX && run_server_command(commands, msg_buffer, client) > 0) {
+            logfmt(stderr, ERROR, "Error while parsing command from socket %d", client->connfd);
+            return;
         }
 
         // read hangup?
@@ -451,10 +464,9 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
     }
 }
 
-void shutdown_server(struct server *srv)
-{
+void shutdown_server(struct server *srv) {
 
-#define SERVER_SHUTDOWN "Server shutting down...\n"
+    #define SERVER_SHUTDOWN "Server shutting down...\n"
     if (srv->clients->head != NULL && srv->clients->capacity >= 1)
     {
         broadcast(srv, NULL, SERVER_SHUTDOWN);
