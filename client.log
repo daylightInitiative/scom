@@ -1,14 +1,5 @@
-2026-01-10 18:36:32.645 - CLIENT - [INFO] Attempting to connect to 127.0.0.1:4444
-2026-01-10 18:36:33.304 - CLIENT - [DEBUG] Connected successfully.
-2026-01-10 18:36:48.715 - CLIENT - [ERROR] Unknown command: /nick
+2026-01-18 15:27:19.011 - CLIENT - [INFO] Attempting to connect to 127.0.0.1:4444
+2026-01-18 15:27:19.018 - CLIENT - [DEBUG] Connected successfully.
+2026-01-18 15:28:26.997 - CLIENT - [WARN] [!] Server closed the connection.
 
-2026-01-10 18:37:00.455 - CLIENT - [ERROR] Unknown command: /nick
-
-2026-01-10 18:37:07.873 - CLIENT - [ERROR] Unknown command: /nick
-
-2026-01-10 18:39:22.390 - CLIENT - [DEBUG] Server: Server shutting down...
-
-
-2026-01-10 18:39:22.409 - CLIENT - [WARN] [!] Server closed the connection.
-
-2026-01-10 18:39:22.425 - CLIENT - [INFO] Closing socket...
+2026-01-18 15:28:27.003 - CLIENT - [INFO] Closing socket...

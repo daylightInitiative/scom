@@ -101,7 +101,7 @@ int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
             break;
 
         case 'E':
-            fprintf(stdout, "Logging to %s\n", optarg);
+            logfmt(stdout, DEBUG, "Logging to %s\n", optarg);
                 // TODO check access(), if not stdin, close(logfile) [verify file]
 
                 /*  TODO add logging library, set log mode by verbosity
@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
     int ret = parse_network_args(argc, argv, &cliopts);
 
     if (ret < 0) {
-        fprintf(stderr, "Failure to parse network arguments\n");
+        logfmt(stderr, ERROR, "Failure to parse network arguments\n");
         exit(EXIT_FAILURE);
     }
 

@@ -27,6 +27,8 @@
 Command commands[] = {
     {"help", "Show available commands", scomd_help},
     {"nick", "Change your nickname for everyone", scomd_nick},
+    {"kick", "Kick a user from the server", scomd_kick},
+    {"list", "Lists all users inside the room", scomd_list},
     {NULL, NULL, NULL} // sentinel
 };
 
@@ -244,11 +246,6 @@ int init_server(struct server *srv, struct serveropts *svopts)
             return -1;
         }
 
-        printf("server listening on %s\n", inet_ntoa(addrinfo->sin_addr));
-
-        struct ipstr ipaddr = get_ip_str(&srv->saddr);
-        fprintf(stdout, "Server Listening on %s:%s\n", ipaddr.address, ipaddr.port);
-
         socklen_t len = 0;
         struct sockaddr_storage srvaddr = {0};
         char ipstrs[INET_ADDRSTRLEN] = {0};
@@ -279,7 +276,7 @@ int init_server(struct server *srv, struct serveropts *svopts)
         // Instead of making two whole functions for both connected client and server
         // why dont we just have two wrappers over a DRY interface
         printf("=====================================\n");
-        printf("Server sock name: %s:%d\n", ipstrs, port);
+        logfmt(stdout, INFO, "Server Listening on: %s:%d\n", ipstrs, port);
 
         // Lets rememeber that 0.0.0.0 means its listening from connections on all interfaces (ips)
 
@@ -333,6 +330,7 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
 
         // TODO: accept may need error handling
         client->connfd = accept(srv->sockfd, (struct sockaddr *)&client->caddr, &addrlen);
+        client->srv = srv; // forgot to set this, glad i caught it
         fcntl(client->connfd, F_SETFL, O_NONBLOCK);
 
         printf("new connection established: %d, %p\n", client->connfd, (void *)&client->caddr);
@@ -421,7 +419,13 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
                         sizeof(msg_buffer),
                         msg_buffer);
 
-            broadcast(srv, client, msg_buffer);
+            // lets preappend the nickname (finally)
+            size_t bufsize = (MAX_MSG + MAX_NAME + 10);
+            char send_buffer[bufsize];
+            memset(&send_buffer, '\0', bufsize);
+
+            snprintf(send_buffer, bufsize, "%s: %s", client->nickname, msg_buffer);
+            broadcast(srv, client, send_buffer);
         }
 
         // parse commands here use strtok to get the argument of the command

@@ -215,6 +215,18 @@ int _logfmt_internal(const char *filename, const int lineno, const char *func_na
     // this is a file not a stream, no colors
     // instead of checking the log files status, we need to check the fd regular file
 
+    // in the event, we just want to log this to the logs and not actually supply a stream
+    if (fd == NULL) {
+        if (defaultLogger->logFile) {
+            fprintf(defaultLogger->logFile, "%s - %s - [%s] ", timestamp, identifier, logLevel);
+            vfprintf(defaultLogger->logFile, fmt, fileargs);
+            fprintf(defaultLogger->logFile, "\n");
+            fflush(defaultLogger->logFile);
+        }
+        return 0;
+    }
+
+
     bool is_regular_file = is_regular_file_or_stream(fd);
 
     if (is_regular_file) {
