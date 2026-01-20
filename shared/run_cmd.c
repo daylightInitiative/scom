@@ -10,7 +10,7 @@
 
 
 int run_command(Command commands[], char *input, void *userdata) {
-    char *argv[MAX_TOKENS];
+    char *argv[MAX_TOKENS] = {0};
     int argc = 0;
 
     char *token = strtok(input, " \t\n");

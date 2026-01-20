@@ -450,7 +450,7 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
     else if (ee.events & (EPOLLRDHUP | EPOLLHUP))
     {
         struct Node *client = ee.data.ptr;
-        printf("Client on socket %d closed the connection\n", client->connfd);
+        logfmt(stdout, INFO, "Client on socket %d closed the connection\n", client->connfd);
 
         // whenever SEND_SHUTDOWN or RCV_SHUTDOWN are marked, this is called.
         // which is equal to a call of shutdown(SHUT_WR | SHUT_RD)
