@@ -20,8 +20,7 @@
 
 static LoggerConfig *defaultLogger = NULL;
 
-
-
+// TODO: pwritev for logging, removing flush for performance
 #define X(name) #name,
 const char *level_names[] = {
     LOG_LEVEL_LIST

@@ -13,7 +13,7 @@ struct clientopts {
     in_port_t port;         // server port     uint16_t     
     struct sockaddr_storage caddr; // TODO: migrate to a caddr for ipv4/ipv6 full support
 
-    FILE *logfile;          // can be stdin, file, or if UNSPEC: (syslog)
+    LoggerConfig *loggerConfig;          // can be stdin, file, or if UNSPEC: (syslog)
     int verbose;            // verbosity enabled
 };
 

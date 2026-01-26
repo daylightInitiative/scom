@@ -38,8 +38,6 @@ void usage(int status) {
 
 int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
-    memset(svopts, 0, sizeof(struct serveropts));
-
     int c;
 
     /* getopts:
@@ -58,7 +56,6 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
     svopts->backlog = MAX_CLIENTS;
     svopts->family = AF_INET; // change to AF_UNSPEC later?
     svopts->port = HOSTPORT;
-    svopts->logfile = NULL;
 
     while ((c = getopt(argc, argv, "46vheE:p:")) != -1) {
 
@@ -74,22 +71,11 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
 
         case 'E':
             fprintf(stdout, "Logging to %s\n", optarg);
-                // TODO check access(), if not stdin, close(logfile) [verify file]
 
-                /*  TODO add logging library, set log mode by verbosity
-                // TODO echo to stdout and logfile bitmask
-                if (!file_exists) {
-                    svopts->logfile = (FILE *)fopen(optarg, "w");
+            //
+            if (strlen(optarg) <= 2048)
+                svopts->loggerConfig->log_file_path = strdup(optarg);
 
-                    if (svopts->logfile 
-                }*/
-
-                // lets say i want to log to stderr and STREAM, its quite a common task isnt it
-
-            break;
-
-        case 'e':
-            svopts->logfile = stderr;
             break;
 
         case 'v':
@@ -151,7 +137,7 @@ int parse_network_args(int argc, char **argv, struct serveropts *svopts) {
     /* . . . */
     /* now lets get the host we're trying to connect to or use the default configured one */
     
-
+    
     return 0;
 }
 
@@ -163,23 +149,25 @@ int main(int argc, char **argv) {
 
     signal(SIGINT, sigint_handler);
 
-    LoggerConfig cfg = {
-        .identifier = "SERVER",
-        .loggerLevel = DEBUG,
-        .log_file_path = "../server.log"
-    };
-
-    init_default_logger(&cfg);
-
     // TODO: handle other signals
 
     int status = -1;
     int ret = -1;   
 
     struct serveropts svopts = {0};
-    struct server srv = {0}; 
+    struct server srv = {0};
 
+    LoggerConfig log_cfg = {
+        .identifier = "SERVER",
+        .loggerLevel = DEBUG,
+        .log_file_path = "../server.log"
+    };
+
+    svopts.loggerConfig = &log_cfg;
     ret = parse_network_args(argc, argv, &svopts);
+
+    // after logger has been setup, initialize it    
+    init_default_logger(svopts.loggerConfig);
 
     if (ret < 0) {
         logfmt(stderr, CRITICAL, "Failure to parse network arguments\n");
@@ -195,7 +183,7 @@ int main(int argc, char **argv) {
 
     while (!stop) {
 
-       poll_server(&srv, &svopts, 1000);    // interval constant interval (#define here)
+       poll_server(&srv, &svopts, SERVER_EPOLL_DELAY);    // interval constant interval (#define here)
 
    }
 

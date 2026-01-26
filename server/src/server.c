@@ -143,14 +143,6 @@ int close_socket(struct Node *client, struct server *srv)
 int broadcast(struct server *srv, struct Node *sender, char *msg)
 {
 
-    /*
-
-        TODO: displaying sender name or server if null
-        TODO: const char *msg fix in read and send
-        TODO: what does broadcast return??
-
-    */
-
     printf("broadcasting\n");
 
     struct Node *client = NULL;
@@ -171,14 +163,6 @@ int broadcast(struct server *srv, struct Node *sender, char *msg)
         }
 
         send_socket(client->connfd, msg, 0);
-
-        /*if (sender != NULL && client == sender) {
-        printf("Triggered that one edge case\n");
-            continue;
-    }*/
-
-        // TODO: send sender name, along with message here
-        // send_socket(client->connfd, msg, 0);
     }
 
     return 0;
@@ -227,72 +211,71 @@ int init_server(struct server *srv, struct serveropts *svopts)
     // it is important that we set what protocol we are using in the storage object
     srv->saddr.ss_family = svopts->family;
 
-    switch (svopts->family)
-    {
+    switch (svopts->family) {
 
-    case AF_INET:
+        case AF_INET:
 
-        struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr((struct sockaddr *)&srv->saddr);
+            struct sockaddr_in *addrinfo = (struct sockaddr_in *)get_in_addr((struct sockaddr *)&srv->saddr);
 
-        addrinfo->sin_family = AF_INET;
-        addrinfo->sin_addr.s_addr = htonl(INADDR_ANY); // htonl (INADDR_ANY) is required here.
-        addrinfo->sin_port = htons(svopts->port);
+            addrinfo->sin_family = AF_INET;
+            addrinfo->sin_addr.s_addr = htonl(INADDR_ANY); // htonl (INADDR_ANY) is required here.
+            addrinfo->sin_port = htons(svopts->port);
 
-        int bind_status = bind(srv->sockfd, (struct sockaddr *)addrinfo, sizeof(*addrinfo));
+            int bind_status = bind(srv->sockfd, (struct sockaddr *)addrinfo, sizeof(*addrinfo));
 
-        if (bind_status < 0)
-        {
-            perror("bind");
-            return -1;
-        }
+            if (bind_status < 0)
+            {
+                perror("bind");
+                return -1;
+            }
 
-        socklen_t len = 0;
-        struct sockaddr_storage srvaddr = {0};
-        char ipstrs[INET_ADDRSTRLEN] = {0};
-        int port = 0;
+            socklen_t len = 0;
+            struct sockaddr_storage srvaddr = {0};
+            char ipstrs[INET_ADDRSTRLEN] = {0};
+            int port = 0;
 
-        printf("receiving sockname\n");
-        len = sizeof(srvaddr);
-        int ret = getsockname(srv->sockfd, (struct sockaddr *)&srvaddr, &len);
+            printf("receiving sockname\n");
+            len = sizeof(srvaddr);
+            int ret = getsockname(srv->sockfd, (struct sockaddr *)&srvaddr, &len);
 
-        if (ret < 0)
-        {
-            perror("getpeername");
-        }
+            if (ret < 0)
+            {
+                perror("getpeername");
+            }
 
-        if (srvaddr.ss_family == AF_INET)
-        {
-            logfmt(stdout, INFO, "Connection normal\n");
-            struct sockaddr_in *s = (struct sockaddr_in *)&srvaddr;
-            port = ntohs(s->sin_port);
-            inet_ntop(AF_INET, &s->sin_addr, ipstrs, sizeof(ipstrs));
-        }
-        else
-        {
-            // IPv6
-            printf("Handling IPv6 connection\n");
-        }
+            if (srvaddr.ss_family == AF_INET)
+            {
+                logfmt(stdout, INFO, "Connection normal\n");
+                struct sockaddr_in *s = (struct sockaddr_in *)&srvaddr;
+                port = ntohs(s->sin_port);
+                inet_ntop(AF_INET, &s->sin_addr, ipstrs, sizeof(ipstrs));
+            }
+            else
+            {
+                // IPv6
+                printf("Handling IPv6 connection\n");
+            }
 
-        // Instead of making two whole functions for both connected client and server
-        // why dont we just have two wrappers over a DRY interface
-        printf("=====================================\n");
-        logfmt(stdout, INFO, "Server Listening on: %s:%d\n", ipstrs, port);
+            // Instead of making two whole functions for both connected client and server
+            // why dont we just have two wrappers over a DRY interface
+            printf("=====================================\n");
+            logfmt(stdout, INFO, "Server Listening on: %s:%d\n", ipstrs, port);
 
-        // Lets rememeber that 0.0.0.0 means its listening from connections on all interfaces (ips)
+            // Lets rememeber that 0.0.0.0 means its listening from connections on all interfaces (ips)
 
-        // INADDR_LOOPBACK (127.0.0.1)
-        //         always refers to the local host via the loopback device;
+            // INADDR_LOOPBACK (127.0.0.1)
+            //         always refers to the local host via the loopback device;
 
-        // INADDR_ANY (0.0.0.0)
-        //       means any address for socket binding;
+            // INADDR_ANY (0.0.0.0)
+            //       means any address for socket binding;
 
-        break;
+            break;
 
-    case AF_INET6:
-        fprintf(stderr, "IPv6 is currently not supported.\n");
-        exit(-1);
+        case AF_INET6:
+            fprintf(stderr, "IPv6 is currently not supported.\n");
+            exit(-1);
 
-        break; // Never going to be supported loool!
+            break; // Never going to be supported loool!
     }
 
     if (listen(srv->sockfd, svopts->backlog) < 0)
@@ -333,7 +316,7 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
         client->srv = srv; // forgot to set this, glad i caught it
         fcntl(client->connfd, F_SETFL, O_NONBLOCK);
 
-        printf("new connection established: %d, %p\n", client->connfd, (void *)&client->caddr);
+        logfmt(stdout, INFO, "New connection established: %d, %p\n", client->connfd, (void *)&client->caddr);
 
         // !TODO trying out getpeername for both server and client.
         // if this works ill just replace the whole thing
@@ -365,7 +348,10 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
             printf("Handling IPv6 connection\n");
         }
 
-        printf("Received new connection from %s:%d\n", ipstr, port);
+        logfmt(stdout, INFO, "Received new connection from %s:%d\n", ipstr, port);
+        // send our greeting
+
+        
 
         add_epoll_watch(srv->epollfd, client->connfd, client, (EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP));
         // TODO: send connected message
@@ -393,7 +379,6 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
 
             #define CLIENT_DISCON "client has left\n"
 
-            // lets try to find out why this isnt sending
             broadcast(srv, NULL, CLIENT_DISCON);
             if (close_socket(client, srv) < 0)
                 fprintf(stderr, "Failure to close client socket: %s\n", strerror(errno));
@@ -411,13 +396,13 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
                 printf("\n%s: %s\n", client->nickname, msg_buffer);
             }
 
-            if (svopts->verbose) // vvvv turn this into a macro
-                fprintf((svopts->logfile == NULL) ? (stdout) : (svopts->logfile),
-                        "<host %s:%u sent %ld byte(s): [%s]>\n",
-                        "hostname",
-                        1234,
-                        sizeof(msg_buffer),
-                        msg_buffer);
+            // if (svopts->verbose) // vvvv turn this into a macro
+            //     fprintf((svopts->logfile == NULL) ? (stdout) : (svopts->logfile),
+            //             "<host %s:%u sent %ld byte(s): [%s]>\n",
+            //             "hostname",
+            //             1234,
+            //             sizeof(msg_buffer),
+            //             msg_buffer);
 
             // lets preappend the nickname (finally)
             size_t bufsize = (MAX_MSG + MAX_NAME + 10);
@@ -427,17 +412,6 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
             snprintf(send_buffer, bufsize, "%s: %s", client->nickname, msg_buffer);
             broadcast(srv, client, send_buffer);
         }
-
-        // parse commands here use strtok to get the argument of the command
-        // if (strncmp("/nick", msg_buffer, 5) == 0)
-        // {
-        //     printf("Recieved switch\n");
-
-        //     memset(client->nickname, '\0', sizeof(client->nickname));
-        //     char *username = "admin";
-        //     strncpy(client->nickname, username, strlen(username));
-        //     // client->nickname = "admin";
-        // }
 
         // C short circuit evaluation makes this possible
         if (msg_buffer[0] == CMD_PREFIX && run_server_command(commands, msg_buffer, client) > 0) {

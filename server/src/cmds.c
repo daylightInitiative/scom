@@ -144,7 +144,7 @@ void scomd_nick(int argc, char *argv[], void *userdata) {
     if (argc > 1 && argv[1] != NULL) {
 
         char *new_name = argv[1];
-        for (int i = 0; i < strlen(new_name); i++) {
+        for (size_t i = 0; i < strlen(new_name); i++) {
             if (ispunct(new_name[i]) || isblank(new_name[i])) {
                 // disallow special characters
                 return;

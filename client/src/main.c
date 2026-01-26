@@ -65,9 +65,6 @@ void usage(int status) {
 }
 
 int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
-
-    memset(svopts, 0, sizeof(struct clientopts));
-
     int c;
 
     /* getopts:
@@ -92,68 +89,56 @@ int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
 
         switch (c) {
 
-        case '4':
-            svopts->family = AF_INET;
-            break;
+            case '4':
+                svopts->family = AF_INET;
+                break;
 
-        case '6':
-            svopts->family = AF_INET6;
-            break;
+            case '6':
+                svopts->family = AF_INET6;
+                break;
 
-        case 'E':
-            logfmt(stdout, DEBUG, "Logging to %s\n", optarg);
-                // TODO check access(), if not stdin, close(logfile) [verify file]
+            case 'E':
+                fprintf(stdout, "Logging to %s\n", optarg);
 
-                /*  TODO add logging library, set log mode by verbosity
-                // TODO echo to stdout and logfile bitmask
-                if (!file_exists) {
-                    svopts->logfile = (FILE *)fopen(optarg, "w");
+                //
+                if (strlen(optarg) <= 2048)
+                    svopts->loggerConfig->log_file_path = strdup(optarg);
+                break;
+                
+            case 'v':
+                svopts->verbose = 1;
+                break;
 
-                    if (svopts->logfile 
-                }*/
+            case 'h':
+                usage(EXIT_SUCCESS);
+                break;
 
-                // lets say i want to log to stderr and STREAM, its quite a common task isnt it
+            case 'p':
 
-            break;
+                printf("custom port selected\n");
+                // TODO atoi fails, returns 0, no way to distingush err
+                // use strtol for increased error output
 
-        case 'e':
-            svopts->logfile = stderr;
-            break;
+                int port = atoi(optarg);
+                printf("port: %u\n", port);
 
-        case 'v':
-            svopts->verbose = 1;
-            break;
+                // TODO binding on port 0 returns a random port number, make this an option?
+                if (port == 0) {
+                    fprintf(stderr, "Invalid port number supplied\n");
+                    return -1;
+                }
 
-        case 'h':
-            usage(EXIT_SUCCESS);
-            break;
+                // connecting doesnt necessarily need root
+                svopts->port = port;
 
-        case 'p':
+                break;
 
-            printf("custom port selected\n");
-            // TODO atoi fails, returns 0, no way to distingush err
-            // use strtol for increased error output
+            case '?':
+                usage(EXIT_FAILURE);
+                break;
 
-            int port = atoi(optarg);
-            printf("port: %u\n", port);
-
-            // TODO binding on port 0 returns a random port number, make this an option?
-            if (port == 0) {
-                fprintf(stderr, "Invalid port number supplied\n");
-                return -1;
-            }
-
-            // connecting doesnt necessarily need root
-            svopts->port = port;
-
-            break;
-
-        case '?':
-            usage(EXIT_FAILURE);
-            break;
-
-        default:
-            exit(EXIT_FAILURE);
+            default:
+                exit(EXIT_FAILURE);
         }
     }
 
@@ -169,19 +154,20 @@ int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
 int main(int argc, char **argv) {
 
     signal(SIGINT, sigint_handler);
+    struct clientopts cliopts = {0};
 
-    LoggerConfig cfg = {
+    LoggerConfig log_cfg = {
         .identifier = "CLIENT",
         .loggerLevel = DEBUG,
         .log_file_path = "../client.log"
     };
 
-    init_default_logger(&cfg);
     // TODO: add a atexit signal catch for SIGSEGV and SIGABRT etc, to clean up resources especially on the server.
 
-    struct clientopts cliopts = {0};
-
+    clientopts.loggerConfig = &log_cfg;
     int ret = parse_network_args(argc, argv, &cliopts);
+
+    init_default_logger(clientopts.loggerConfig);
 
     if (ret < 0) {
         logfmt(stderr, ERROR, "Failure to parse network arguments\n");
