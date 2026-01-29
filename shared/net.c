@@ -22,7 +22,7 @@
 
 /* returns an ipstr struct that contains the presentation string converted ipaddress and port */
 struct ipstr get_ip_str(struct sockaddr_storage *ss) {
-    struct sockaddr_in *addr_in = (struct sockaddr_in *)get_in_addr((struct sockaddr *)ss);
+    //struct sockaddr_in *addr_in = (struct sockaddr_in *)get_in_addr((struct sockaddr *)ss);
     struct ipstr str = {0};
     
     const char *paddress = NULL;

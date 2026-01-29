@@ -16,12 +16,15 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/select.h>
 
 #include <signal.h>
 #include <time.h>
 #include <netdb.h>
 
+#include <stdint.h>
 #include "../shared/net.h"
 #include "cmds.h"
 #include "client.h"
@@ -34,6 +37,7 @@
 
 Command commands[] = {
     {"help", "Show available commands", scom_help},
+    {"ping", "Displays the ping of the currently connected server", scom_ping},
     {"exit", "Exit the program", scom_exit},
     {"quit", "Quit the program", scom_exit},
     {NULL, NULL, NULL} // sentinel
@@ -64,7 +68,7 @@ void usage(int status) {
     exit(status);
 }
 
-int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
+int parse_network_args(int argc, char **argv, struct Clientopts *svopts) {
     int c;
 
     /* getopts:
@@ -83,7 +87,6 @@ int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
     svopts->verbose = false;
     svopts->family = AF_INET; // change to AF_UNSPEC later?
     svopts->port = HOSTPORT;
-    svopts->logfile = NULL;
 
     while ((c = getopt(argc, argv, "46vheE:p:")) != -1) {
 
@@ -154,7 +157,12 @@ int parse_network_args(int argc, char **argv, struct clientopts *svopts) {
 int main(int argc, char **argv) {
 
     signal(SIGINT, sigint_handler);
-    struct clientopts cliopts = {0};
+    struct Clientopts cliopts = {0};
+
+    // options should not hold our client information, so i'm changing it to its own struct
+    struct Client client = {0};
+    invalidate_timespec(&client.last_ping);
+    invalidate_timespec(&client.last_pong); 
 
     LoggerConfig log_cfg = {
         .identifier = "CLIENT",
@@ -164,10 +172,10 @@ int main(int argc, char **argv) {
 
     // TODO: add a atexit signal catch for SIGSEGV and SIGABRT etc, to clean up resources especially on the server.
 
-    clientopts.loggerConfig = &log_cfg;
+    cliopts.loggerConfig = &log_cfg;
     int ret = parse_network_args(argc, argv, &cliopts);
 
-    init_default_logger(clientopts.loggerConfig);
+    init_default_logger(cliopts.loggerConfig);
 
     if (ret < 0) {
         logfmt(stderr, ERROR, "Failure to parse network arguments\n");
@@ -183,6 +191,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    client.serverfd = sockfd; // store our server connection fd
+
     /* set socket options */
     struct timeval tv;
     tv.tv_sec = 3;  // seconds
@@ -192,13 +202,13 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    memset(&cliopts.caddr, '\0', sizeof(struct sockaddr_storage));
-    cliopts.caddr.ss_family = AF_INET;
+    memset(&client.caddr, '\0', sizeof(struct sockaddr_storage));
+    client.caddr.ss_family = AF_INET;
 
     // now that we've emptied the sockaddr_storage, we need to now branch on IP version
     if (cliopts.family == AF_INET) {
 
-        struct sockaddr_in *in_addr = (struct sockaddr_in *)&cliopts.caddr;
+        struct sockaddr_in *in_addr = (struct sockaddr_in *)&client.caddr;
 
         in_addr->sin_family = AF_INET; // for right now ipv4 is hard coded later will be getopts
         in_addr->sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -206,8 +216,9 @@ int main(int argc, char **argv) {
     }
 
     // manually fill the options
+    
 
-    struct ipstr ipinfo = get_ip_str(&cliopts.caddr);
+    struct ipstr ipinfo = get_ip_str(&client.caddr);
     logfmt(stdout, INFO, "Attempting to connect to %s:%s", ipinfo.address, ipinfo.port);
 
     socklen_t addrlen;
@@ -219,7 +230,7 @@ int main(int argc, char **argv) {
     }
 
     int status = -1;
-    status = connect(sockfd, (struct sockaddr *)&cliopts.caddr, addrlen);
+    status = connect(sockfd, (struct sockaddr *)&client.caddr, addrlen);
     if (status < 0) {
         logfmt(stderr, ERROR, "Failed to connect\n");
         perror("connect");
@@ -258,9 +269,20 @@ int main(int argc, char **argv) {
             char msg_buffer[MAX_MSG] = {0};
             int n = read_socket(sockfd, msg_buffer, MAX_MSG, 0);
             if (n > 0) {
-                logfmt(stdout, DEBUG, "Server: %s\n", msg_buffer);
-            }
-            else if (n == 0) {
+
+                if (strcmp(msg_buffer, "PONG\n") == 0) {
+                    clock_gettime(CLOCK_MONOTONIC, &client.last_pong);
+
+                    if (client.last_ping.tv_sec >= 0 && client.last_pong.tv_sec >= 0) {
+                        long ms = (client.last_pong.tv_sec - client.last_ping.tv_sec) * 1000
+                        + (client.last_pong.tv_nsec - client.last_ping.tv_nsec) / 1000000;
+
+                        printf("Server ping: %ld ms\n", ms);
+                    }
+                } else {
+                    logfmt(stdout, DEBUG, "Server: %s\n", msg_buffer);
+                }
+            } else if (n == 0) {
                 logfmt(stdout, WARN, "[!] Server closed the connection.\n");
                 break;
             }
@@ -282,7 +304,8 @@ int main(int argc, char **argv) {
                 if (cmd_buffer[0] == CMD_PREFIX) {
 
                     // if it has a prefix then try to run it
-                    if (run_command(commands, cmd_buffer, NULL) > 0) {
+                    // passing just the essential socket fd
+                    if (run_command(commands, cmd_buffer, &client) > 0) {
                         // has the right prefix but isnt a local command
                         ssize_t bytes_sent = send_socket(sockfd, send_buffer, 0);
                         if (bytes_sent < 0) {

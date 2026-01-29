@@ -1,5 +1,8 @@
-2026-01-18 15:27:19.011 - CLIENT - [INFO] Attempting to connect to 127.0.0.1:4444
-2026-01-18 15:27:19.018 - CLIENT - [DEBUG] Connected successfully.
-2026-01-18 15:28:26.997 - CLIENT - [WARN] [!] Server closed the connection.
-
-2026-01-18 15:28:27.003 - CLIENT - [INFO] Closing socket...
+2026-01-29 15:20:04.602 - CLIENT - [INFO] Attempting to connect to 127.0.0.1:4444
+2026-01-29 15:20:04.605 - CLIENT - [DEBUG] Connected successfully.
+2026-01-29 15:20:07.434 - CLIENT - [INFO] Conducting ping test
+2026-01-29 15:20:10.411 - CLIENT - [INFO] Conducting ping test
+2026-01-29 15:20:13.138 - CLIENT - [INFO] Conducting ping test
+2026-01-29 15:20:15.228 - CLIENT - [INFO] Conducting ping test
+2026-01-29 15:20:17.291 - CLIENT - [INFO] Conducting ping test
+2026-01-29 15:20:31.247 - CLIENT - [INFO] Closing socket...

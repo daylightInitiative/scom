@@ -337,7 +337,6 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
 
         if (peeraddr.ss_family == AF_INET)
         {
-            printf("Connection normal\n");
             struct sockaddr_in *s = (struct sockaddr_in *)&peeraddr;
             port = ntohs(s->sin_port);
             inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof(ipstr));
@@ -417,6 +416,10 @@ void poll_server(struct server *srv, struct serveropts *svopts, int wait)
         if (msg_buffer[0] == CMD_PREFIX && run_server_command(commands, msg_buffer, client) > 0) {
             logfmt(stderr, ERROR, "Error while parsing command from socket %d", client->connfd);
             return;
+        } else if (strcmp(msg_buffer, "PING\n") == 0) {
+
+            logfmt(stdout, INFO, "Received ping request, answering");
+            send_socket(client->connfd, "PONG\n", 0);
         }
 
         // read hangup?

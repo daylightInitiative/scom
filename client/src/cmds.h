@@ -7,5 +7,6 @@ void scom_usage(int status);
 void scom_help(int argc, char *argv[], void *userdata);
 void scom_exit(int argc, char *argv[], void *userdata);
 
+void scom_ping(int argc, char *argv[], void *userdata);
 
 #endif

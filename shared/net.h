@@ -3,7 +3,7 @@
 
 #define MAX_PORT_LEN 10 // 65535
 #define HOSTPORT 4444
-#define MAX_MSG 512
+#define MAX_MSG 1024
 
 
 struct ipstr {

@@ -14,7 +14,6 @@
 #define SERVER_GREETING "Welcome to the server\n"
 #define SERVER_SHUTDOWN "SERVER_SHUTDOWN\n"
 
-#define MAX_MSG      512
 #define MAX_CLIENTS  24
 
 struct serveropts {
